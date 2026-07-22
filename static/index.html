@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MatchAI Pro - AI Job & Candidate Matcher Portal</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header with Role Switcher -->
+    <header>
+      <div class="logo-container">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>MatchAI Pro</h1>
+          <span>AI Job & Applicant Matching Portal</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button id="apiKeyBtn" class="btn-secondary" style="font-size: 0.82rem; padding: 6px 14px;" onclick="openApiKeyModal()">
+          🔑 API Key: Loading...
+        </button>
+
+        <!-- Role Switcher Toggle -->
+        <div class="role-switcher">
+          <button id="roleHrBtn" class="role-btn active" onclick="switchPortalRole('hr')">
+            💼 HR Manager Portal
+          </button>
+          <button id="roleSeekerBtn" class="role-btn" onclick="switchPortalRole('seeker')">
+            👤 Job Seeker Portal
+          </button>
+        </div>
+      </div>
+    </header>
+
+
+    <!-- ==================== HR MANAGER PORTAL ==================== -->
+    <div id="hrPortalView" class="portal-view active">
+      <nav class="sub-nav" style="margin-bottom: 24px;">
+        <button class="nav-btn active" onclick="switchHrTab('hrPostTab', this)">
+          📝 1. Post Job Position
+        </button>
+        <button class="nav-btn" onclick="switchHrTab('hrApplicantsTab', this)">
+          🏆 2. Applicants & Analytics
+        </button>
+        <button class="nav-btn" onclick="switchHrTab('hrRepositoryTab', this)">
+          📁 3. Candidate Directory
+        </button>
+      </nav>
+
+      <!-- HR Tab 1: Post Job Position -->
+      <div id="hrPostTab" class="tab-content active">
+        <div class="glass-panel">
+          <div class="panel-title">💼 Post Job Position (AI LLM Auto-Extracts Skills & Qualifications)</div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+            Simply paste or type the job description, key responsibilities, and qualifications below. Our Google AI LLM backend will automatically extract key skills, required experience, education level, skill weights, and score all candidates!
+          </p>
+
+          <div id="modeFormContainer">
+            <div class="grid-2">
+              <div class="form-group">
+                <label>Job Position Title *</label>
+                <input type="text" id="customJdTitle" class="form-control" placeholder="e.g. Senior Python Backend Engineer">
+              </div>
+              <div class="form-group">
+                <label>Department</label>
+                <input type="text" id="customJdDept" class="form-control" placeholder="e.g. Engineering">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Full Job Description, Key Responsibilities, Skills & Qualifications *</label>
+              <textarea id="customJdDesc" class="form-control" rows="8" placeholder="Paste full job posting here (e.g. Responsibilities: Design FastAPI microservices, optimize SQL queries. Requirements: 4+ years Python, Docker, REST API, Bachelor's in CS...)"></textarea>
+            </div>
+
+            <div class="grid-3">
+              <div class="form-group">
+                <label>Target Top Candidates for Interview ($X$) *</label>
+                <input type="number" id="customJdTargetCount" class="form-control" value="3" min="1" max="20">
+              </div>
+              <div class="form-group">
+                <label>Estimated Salary Min ($ / Year)</label>
+                <input type="number" id="customJdSalMin" class="form-control" value="120000" step="5000">
+              </div>
+              <div class="form-group">
+                <label>Estimated Salary Max ($ / Year)</label>
+                <input type="number" id="customJdSalMax" class="form-control" value="160000" step="5000">
+              </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <button class="btn-primary" style="padding: 12px 28px; font-size: 1rem; background: linear-gradient(135deg, #06b6d4 0%, #6366f1 50%, #8b5cf6 100%);" onclick="autoExtractJobDetailsWithLLM()">
+                🤖 Publish Job & Auto-Extract Criteria via Google AI LLM
+              </button>
+              <span id="aiPublishStatus" style="margin-left: 14px; font-weight: 600; font-size: 0.9rem; color: var(--accent-cyan);"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR Tab 2: HR Analytics Dashboard & Applicants Leaderboard -->
+      <div id="hrApplicantsTab" class="tab-content">
+        <div class="glass-panel" style="margin-bottom: 24px;">
+          <div class="panel-title">💼 Select Job Opening to Evaluate & Analyze Candidates</div>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <select id="jobSelect" class="job-selector" style="margin-bottom: 0;" onchange="loadSelectedJobApplicants()">
+              <option value="">-- Select Target Job Opening --</option>
+            </select>
+            <button class="btn-primary" onclick="loadSelectedJobApplicants()" style="white-space: nowrap;">
+              📊 Load Analytics & Rank Applicants
+            </button>
+          </div>
+
+          <div id="jobDetailsCard" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); display: none; margin-top: 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 id="jdTitle" style="color: #fff; font-size: 1.1rem;"></h3>
+              <span id="jdSalaryBadge" class="salary-badge"></span>
+            </div>
+            <p id="jdDesc" style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;"></p>
+            <div style="font-size: 0.85rem; color: var(--text-sub);">
+              <strong>Required Skills:</strong> <span id="jdSkillsList"></span> | 
+              <strong>Target Candidates for Interview ($X$):</strong> <span id="jdTargetCountBadge" style="color: var(--accent-cyan); font-weight:700;"></span> | 
+              <strong>Availability Required:</strong> <span id="jdAvailBadge" style="color: var(--accent-amber); font-weight:700;"></span> | 
+              <strong>Nationality Req:</strong> <span id="jdNatBadge" style="color: var(--accent-emerald); font-weight:700;"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HR Analytics KPI Summary -->
+        <div id="analyticsKpiContainer" class="analytics-grid" style="display: none;">
+          <div class="kpi-card">
+            <div class="kpi-label">Total Applicants</div>
+            <div id="kpiTotalApps" class="kpi-value">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Interview Target ($X$)</div>
+            <div id="kpiTargetCount" class="kpi-value">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Shortlisted for Interview</div>
+            <div id="kpiShortlisted" class="kpi-value">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Top Candidate Avg Score</div>
+            <div id="kpiAvgTopScore" class="kpi-value">0%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Skill Weight Index</div>
+            <div id="kpiSkillIndex" class="kpi-value">0%</div>
+          </div>
+        </div>
+
+        <!-- Visual Analytics Chart & Comparison Container -->
+        <div id="visualAnalyticsPanel" class="glass-panel" style="display: none; margin-bottom: 24px;">
+          <div class="panel-title">📊 Top Candidates Weighted Skill Breakdown & Comparison</div>
+          <div id="chartContainer" style="min-height: 180px; padding: 10px;">
+            <!-- SVG / HTML Skill Score Breakdown Chart inserted by JS -->
+          </div>
+        </div>
+
+        <!-- Applicant Leaderboard -->
+        <div class="glass-panel">
+          <div class="panel-title">🏆 Candidate Ranking Leaderboard & Interview Shortlist</div>
+          <div id="leaderboardContainer">
+            <p style="color: var(--text-muted); text-align: center; padding: 30px;">
+              Select a Job Position above to evaluate applicants and view AI suggestions.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HR Tab 3: Candidate Directory Repository -->
+      <div id="hrRepositoryTab" class="tab-content">
+        <div class="glass-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="panel-title" style="margin-bottom:0;">📁 Candidate Directory Repository</div>
+            <button class="btn-secondary" onclick="loadCandidatesList()">🔄 Refresh List</button>
+          </div>
+          <div id="candidatesListTable">
+            <p style="color: var(--text-muted);">Loading candidate records...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+
+
+    <!-- ==================== JOB SEEKER PORTAL ==================== -->
+    <div id="seekerPortalView" class="portal-view">
+      <nav class="sub-nav">
+        <button class="nav-btn active" onclick="switchSeekerTab('seekerUploadTab', this)">
+          📄 Upload Resume & Profile
+        </button>
+        <button class="nav-btn" onclick="switchSeekerTab('seekerJobsTab', this)">
+          💼 Browse & Apply for Jobs
+        </button>
+        <button class="nav-btn" onclick="switchSeekerTab('seekerAppsTab', this)">
+          📋 My Applications
+        </button>
+      </nav>
+
+      <!-- Seeker Tab 1: Upload Resume -->
+      <div id="seekerUploadTab" class="tab-content active">
+        <div class="grid-2">
+          <div class="glass-panel">
+            <div class="panel-title">📄 Upload Your Resume (PDF / DOCX)</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+              Upload your resume to extract skills, experience, and work history automatically. Once uploaded, you can apply for active job openings.
+            </p>
+
+            <div id="dropzone" class="dropzone" onclick="document.getElementById('fileInput').click()">
+              <div class="dropzone-icon">☁️</div>
+              <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 6px;">Drag & Drop Resume PDF Here</h3>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">or click to browse files (PDF, DOCX, TXT)</p>
+              <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleFileSelect(event)">
+              <button class="btn-primary" type="button">Select Resume File</button>
+            </div>
+
+            <div id="uploadStatus" style="margin-top: 16px; font-weight: 600; display: none;"></div>
+          </div>
+
+          <div class="glass-panel">
+            <div class="panel-title">✨ My Extracted Profile Preview</div>
+            <div id="parsedProfileContainer" style="color: var(--text-muted); text-align: center; padding: 40px 10px;">
+              No resume uploaded yet. Select or drop a file to create your candidate profile.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seeker Tab 2: Browse & Apply Jobs -->
+      <div id="seekerJobsTab" class="tab-content">
+        <div class="glass-panel">
+          <div class="panel-title">💼 Active Job Openings</div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+            Browse open positions posted by HR, view salary ranges and requirements, and submit your application.
+          </p>
+          <div id="seekerJobsContainer" class="grid-2">
+            <p style="color: var(--text-muted);">Loading active job postings...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seeker Tab 3: My Applications Tracker -->
+      <div id="seekerAppsTab" class="tab-content">
+        <div class="glass-panel">
+          <div class="panel-title">📋 My Submitted Job Applications</div>
+          <div id="seekerAppsContainer">
+            <p style="color: var(--text-muted);">Loading your submitted applications...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HR Proposal Detail Modal -->
+  <div id="hrModal" class="modal-overlay">
+    <div class="modal-body">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h2 id="modalCandidateName" style="color: #fff; font-size: 1.4rem;">Candidate Evaluation</h2>
+      <p id="modalJobTitle" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px;"></p>
+      
+      <div id="modalRecBanner" class="rec-banner highly-recommended">
+        <span id="modalRecText">Highly Recommended for Interview</span>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+        <span id="modalQualBadge" class="badge-qual success">✓ Qualification Met</span>
+        <span id="modalSkillScoreBadge" class="badge-qual success">Weighted Skill Score: 85%</span>
+        <span id="modalAvailBadge" class="badge-qual success">Availability Met</span>
+        <span id="modalNatBadge" class="badge-qual success">Nationality Met</span>
+      </div>
+
+      <div style="margin: 20px 0;">
+        <h4 style="color: #fff; margin-bottom: 8px;">AI HR Recommendation Rationale & Selection Reason:</h4>
+        <p id="modalRationale" style="color: var(--text-sub); background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.95rem;"></p>
+      </div>
+
+      <!-- Skill Score Breakdown Table in Modal -->
+      <div style="margin: 20px 0;">
+        <h4 style="color: #fff; margin-bottom: 8px;">⚖️ Weighted Skill Score Breakdown:</h4>
+        <div id="modalSkillBreakdownContainer" style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <table class="breakdown-table">
+            <thead>
+              <tr>
+                <th>Skill Name</th>
+                <th>HR Weight</th>
+                <th>Matched?</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="modalSkillBreakdownBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin: 20px 0;">
+        <div style="background: rgba(16, 185, 129, 0.08); padding: 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+          <h4 style="color: #6ee7b7; margin-bottom: 6px;">💪 Key Strengths:</h4>
+          <ul id="modalStrengths" style="color: var(--text-sub); padding-left: 18px; font-size: 0.9rem;"></ul>
+        </div>
+        <div style="background: rgba(244, 63, 94, 0.08); padding: 14px; border-radius: 8px; border: 1px solid rgba(244, 63, 94, 0.2);">
+          <h4 style="color: #fca5a5; margin-bottom: 6px;">⚠️ Gaps & Areas to Verify:</h4>
+          <ul id="modalGaps" style="color: var(--text-sub); padding-left: 18px; font-size: 0.9rem;"></ul>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+        <button id="modalShortlistBtn" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+          ⭐ Proceed to Final Selection (Shortlist for Interview)
+        </button>
+        <button class="btn-secondary" onclick="closeModal()">Close Evaluation</button>
+      </div>
+    </div>
+  <!-- Google AI API Key Configuration Modal -->
+  <div id="apiKeyModal" class="modal-overlay">
+    <div class="modal-body" style="max-width: 500px;">
+      <button class="modal-close" onclick="closeApiKeyModal()">✕</button>
+      <h3 style="color: #fff; margin-bottom: 8px;">🔑 Configure Google AI (Gemini) API Key</h3>
+      <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 16px;">
+        As a Google AI Pro user, paste your Gemini API key below to enable LLM resume parsing, job criteria extraction, and candidate recommendations.
+      </p>
+
+      <div class="form-group">
+        <label>Gemini / Google AI API Key:</label>
+        <input type="password" id="userApiKeyInput" class="form-control" placeholder="AIzaSy...">
+      </div>
+
+      <div style="font-size: 0.85rem; color: var(--text-sub); margin: 12px 0;">
+        Current Status: <span id="apiKeyModalStatus" style="font-weight: 700; color: var(--accent-cyan);">Checking...</span>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <button class="btn-primary" onclick="saveApiKey()">Save & Apply API Key</button>
+        <button class="btn-secondary" onclick="closeApiKeyModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
+
+
