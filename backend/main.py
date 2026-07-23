@@ -1001,6 +1001,47 @@ def get_interview_session(session_id: str):
     return session
 
 
+# Multi-Agent Pipeline Endpoints
+@app.get("/api/orchestrate/f2f-briefing/{candidate_id}/{job_id}")
+def get_hiring_manager_f2f_briefing(candidate_id: str, job_id: str):
+    """Stage 4 Agent Endpoint: Generates a tailored Hiring Manager Face-to-Face Interview Briefing.
+    Cross-examines Stage 1 requirements, Stage 2 match gaps, and Stage 3 voice interview results.
+    """
+    # 1. Retrieve Candidate Record
+    candidates = vector_store.list_all_candidates()
+    cand_record = next((c for c in candidates if c.id == candidate_id), None)
+    if not cand_record:
+        raise HTTPException(status_code=404, detail=f"Candidate '{candidate_id}' not found.")
+
+    # 2. Retrieve Job Description
+    job_item = next((j for j in SAMPLE_JOBS if j.get("id") == job_id), None)
+    if not job_item:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+    
+    job_desc = JobDescription(**job_item)
+
+    # 3. Retrieve Candidate Match Analysis
+    match_analyses = matcher.match_candidates(job_desc, candidate_records=[cand_record])
+    match_analysis = match_analyses[0] if match_analyses else None
+    if not match_analysis:
+        raise HTTPException(status_code=500, detail="Failed to run candidate match analysis.")
+
+    # 4. Check for completed Stage 3 Voice Interview session
+    interview_session = next((s for s in INTERVIEW_SESSIONS_DATABASE.values() if s.candidate_id == candidate_id and s.job_id == job_id), None)
+
+    # 5. Run Stage 4 Agent
+    from backend.agents import MultiAgentOrchestrator
+    orchestrator = MultiAgentOrchestrator(vector_store)
+    briefing = orchestrator.orchestrate_stage4_briefing(
+        job=job_desc,
+        candidate=cand_record.profile,
+        match_analysis=match_analysis,
+        interview_session=interview_session
+    )
+
+    return briefing
+
+
 @app.get("/api/interview/candidate/{candidate_id}")
 def get_candidate_interview_history(candidate_id: str):
     """Get all interview sessions for a specific candidate."""

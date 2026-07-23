@@ -163,6 +163,43 @@ function switchPortalRole(role) {
   }
 }
 
+function switchHrStageView(stageKey) {
+  const stageViews = {
+    'post_job': 'stagePostJobView',
+    'screening': 'stageScreeningView',
+    'ai_interview': 'stageAiInterviewView',
+    'physical_interview': 'stagePhysicalInterviewView',
+    'selection': 'stageSelectionView'
+  };
+
+  const stageNodes = {
+    'post_job': 'stageNodePostJob',
+    'screening': 'stageNodeScreening',
+    'ai_interview': 'stageNodeAi',
+    'physical_interview': 'stageNodePhysical',
+    'selection': 'stageNodeSelection'
+  };
+
+  Object.keys(stageViews).forEach(key => {
+    const viewEl = document.getElementById(stageViews[key]);
+    const nodeEl = document.getElementById(stageNodes[key]);
+    if (viewEl) viewEl.style.display = (key === stageKey) ? 'block' : 'none';
+    if (nodeEl) nodeEl.classList.toggle('active', key === stageKey);
+  });
+
+  if (stageKey === 'screening') {
+    fetchSampleJobs().then(() => {
+      const select = document.getElementById("jobSelect");
+      if (select && select.options.length > 1 && !select.value) {
+        select.selectedIndex = 1;
+        loadSelectedJobApplicants();
+      }
+    });
+  } else if (stageKey === 'ai_interview') {
+    loadHRCompletedInterviews();
+  }
+}
+
 function switchHrTab(tabId, btnElement) {
   document.querySelectorAll("#hrPortalView .tab-content").forEach(el => el.classList.remove("active"));
   document.querySelectorAll("#hrPortalView .nav-btn").forEach(el => el.classList.remove("active"));
@@ -523,12 +560,24 @@ async function submitCustomJobAndMatch() {
 }
 
 async function autoExtractJobDetailsWithLLM() {
-  const title = document.getElementById("customJdTitle").value.trim() || "Target Job Position";
-  const dept = document.getElementById("customJdDept") ? document.getElementById("customJdDept").value.trim() : "Engineering";
-  const desc = document.getElementById("customJdDesc") ? document.getElementById("customJdDesc").value.trim() : "";
-  const targetCount = document.getElementById("customJdTargetCount") ? (parseInt(document.getElementById("customJdTargetCount").value) || 3) : 3;
-  const salMin = parseFloat(document.getElementById("customJdSalMin").value) || 120000;
-  const salMax = parseFloat(document.getElementById("customJdSalMax").value) || 160000;
+  const titleEl = document.getElementById("customJdTitle");
+  const title = (titleEl && titleEl.value.trim()) || "Target Job Position";
+
+  const deptEl = document.getElementById("customJdDept");
+  const dept = (deptEl && deptEl.value.trim()) || "Engineering";
+
+  const descEl = document.getElementById("customJdDesc");
+  const desc = (descEl && descEl.value.trim()) || "";
+
+  const targetCountEl = document.getElementById("customJdTargetCount");
+  const targetCount = targetCountEl ? (parseInt(targetCountEl.value) || 3) : 3;
+
+  const salMinEl = document.getElementById("customJdSalMin");
+  const salMin = salMinEl ? (parseFloat(salMinEl.value) || 120000) : 120000;
+
+  const salMaxEl = document.getElementById("customJdSalMax");
+  const salMax = salMaxEl ? (parseFloat(salMaxEl.value) || 160000) : 160000;
+
   const statusSpan = document.getElementById("aiPublishStatus");
 
   if (!desc.trim()) {
@@ -569,16 +618,16 @@ async function autoExtractJobDetailsWithLLM() {
     selectedJob = await saveRes.json();
     await fetchSampleJobs();
 
-    if (statusSpan) statusSpan.innerText = `✅ Extracted ${selectedJob.required_skills.length} key skills — see criteria preview below!`;
+    const skillCount = (selectedJob.required_skills && selectedJob.required_skills.length) || 0;
+    if (statusSpan) statusSpan.innerText = `✅ Extracted ${skillCount} key skills — advancing to Stage 2 (Smart Screening)...`;
 
-    // Wait 1.5s so HR can read the preview, then advance to Stage 2 (Screening)
     setTimeout(() => {
       currentMatchResults = [];
       switchHrStageView('screening');
       const select = document.getElementById("jobSelect");
       if (select) select.value = selectedJob.id;
       loadSelectedJobApplicants();
-    }, 1500);
+    }, 600);
 
   } catch (err) {
     if (statusSpan) statusSpan.innerText = `❌ Error: ${err.message}`;
@@ -709,8 +758,12 @@ function setRankingMode(mode) {
 
 
 async function loadSelectedJobApplicants() {
-  const jobId = document.getElementById("jobSelect").value;
-  selectedJob = sampleJobs.find(j => j.id === jobId);
+  const selectEl = document.getElementById("jobSelect");
+  const jobId = selectEl ? selectEl.value : "";
+  if (jobId) {
+    const found = sampleJobs.find(j => j.id === jobId);
+    if (found) selectedJob = found;
+  }
 
   const card = document.getElementById("jobDetailsCard");
   const container = document.getElementById("leaderboardContainer");
@@ -718,10 +771,10 @@ async function loadSelectedJobApplicants() {
   const visualPanel = document.getElementById("visualAnalyticsPanel");
 
   if (!selectedJob) {
-    card.style.display = "none";
-    kpiContainer.style.display = "none";
-    visualPanel.style.display = "none";
-    container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 30px;">Select a Job Position above to evaluate applicants.</p>`;
+    if (card) card.style.display = "none";
+    if (kpiContainer) kpiContainer.style.display = "none";
+    if (visualPanel) visualPanel.style.display = "none";
+    if (container) container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 30px;">Select a Job Position above to evaluate applicants.</p>`;
     return;
   }
 
@@ -1013,6 +1066,14 @@ function openHRProposalModal(candidateId) {
   document.getElementById("modalStrengths").innerHTML = (match.strengths || []).map(s => `<li>${s}</li>`).join("");
   document.getElementById("modalGaps").innerHTML = (match.gaps || []).map(g => `<li>${g}</li>`).join("");
 
+  // Store active match reference & trigger Stage 4 Agent Briefing load
+  activeModalMatch = match;
+  if (match.hiring_manager_briefing) {
+    renderStage4Briefing(match.hiring_manager_briefing);
+  } else {
+    loadStage4Briefing(match.candidate_id, match.job_id);
+  }
+
   const btn = document.getElementById("modalShortlistBtn");
   btn.onclick = () => shortlistCandidate(match.candidate_id);
 
@@ -1033,6 +1094,83 @@ function openHRProposalModal(candidateId) {
   }
 
   document.getElementById("hrModal").classList.add("active");
+}
+
+let activeModalMatch = null;
+
+async function loadStage4Briefing(candidateId, jobId) {
+  const container = document.getElementById("modalStage4Container");
+  if (!container) return;
+  
+  container.innerHTML = `<div style="color:var(--cyan); font-size:0.82rem;">⏳ Stage 4 Agent running: Analyzing Stage 1-3 results to formulate Hiring Manager F2F Q&As...</div>`;
+  
+  try {
+    const res = await fetch(`/api/orchestrate/f2f-briefing/${candidateId}/${jobId}`);
+    if (!res.ok) throw new Error("Failed to generate Stage 4 briefing");
+    const briefing = await res.json();
+    renderStage4Briefing(briefing);
+  } catch (e) {
+    container.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem;">Stage 4 briefing active based on initial match analysis.</div>`;
+  }
+}
+
+function renderStage4Briefing(briefing) {
+  const container = document.getElementById("modalStage4Container");
+  if (!container) return;
+
+  const weakHtml = (briefing.weak_competencies || []).map(wc => `
+    <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:8px; padding:10px; margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-weight:700; color:#fbbf24; font-size:0.82rem;">🎯 Focus Area: ${wc.topic}</span>
+        <span style="font-size:0.68rem; background:rgba(245,158,11,0.2); color:#fde68a; padding:1px 6px; border-radius:6px; font-weight:700;">${wc.severity}</span>
+      </div>
+      <p style="color:var(--text-300); font-size:0.78rem; margin:0 0 4px 0; line-height:1.4;">${wc.gap_description}</p>
+      <div style="font-size:0.7rem; color:var(--text-500);">Source: ${wc.evidence_source}</div>
+    </div>
+  `).join("");
+
+  const qHtml = (briefing.proposed_f2f_questions || []).map((q, idx) => `
+    <div style="background:rgba(8,14,30,0.8); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:12px; margin-bottom:10px;">
+      <div style="font-size:0.75rem; font-weight:700; color:var(--cyan); margin-bottom:4px;">
+        Question #${idx+1} [Probe Target: ${q.competency}]
+      </div>
+      <div style="color:#fff; font-weight:700; font-size:0.84rem; margin-bottom:6px; line-height:1.5;">
+        "${q.question}"
+      </div>
+      <div style="font-size:0.76rem; color:var(--text-400); margin-bottom:4px;">
+        <strong>Intent:</strong> ${q.intent_and_focus}
+      </div>
+      <div style="font-size:0.76rem; color:#6ee7b7; background:rgba(16,185,129,0.08); padding:6px; border-radius:6px;">
+        <strong>Signal Guide:</strong> ${q.what_to_look_for}
+      </div>
+    </div>
+  `).join("");
+
+  container.innerHTML = `
+    <div style="margin-bottom:12px; font-size:0.8rem; color:var(--text-300); line-height:1.5;">
+      ${briefing.stage1_summary} ${briefing.stage2_match_summary}
+    </div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div>
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-500); text-transform:uppercase; margin-bottom:8px;">
+          ⚠️ Weakly Demonstrated Areas (${(briefing.weak_competencies||[]).length})
+        </div>
+        ${weakHtml || '<div style="color:var(--text-500); font-size:0.8rem;">No weak areas flagged.</div>'}
+      </div>
+      <div>
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-500); text-transform:uppercase; margin-bottom:8px;">
+          ❓ Proposed F2F Interview Questions (${(briefing.proposed_f2f_questions||[]).length})
+        </div>
+        ${qHtml}
+      </div>
+    </div>
+  `;
+}
+
+function generateStage4BriefingUI() {
+  if (activeModalMatch) {
+    loadStage4Briefing(activeModalMatch.candidate_id, activeModalMatch.job_id);
+  }
 }
 
 function closeModal() {

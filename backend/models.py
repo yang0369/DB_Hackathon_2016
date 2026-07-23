@@ -29,13 +29,45 @@ class CandidateProfile(BaseModel):
     years_of_experience: Optional[float] = Field(default=0.0, description="Estimated total years of professional experience")
     availability: Optional[str] = Field(default="Immediate", description="Availability e.g. Immediate, 2 Weeks Notice, 1 Month Notice")
     nationality: Optional[str] = Field(default="Any / Citizen", description="Nationality or work authorization status")
+    expected_salary: Optional[float] = Field(default=None, description="Expected annual or monthly salary threshold")
 
 class HardCriteria(BaseModel):
     """Hard non-negotiable criteria (knockout filters) extracted from job description."""
     mandatory_nationality: Optional[str] = Field(default="Any", description="Strict required nationality or work authorization, e.g. Singapore Citizen/PR, US Citizen")
     strict_degree_required: bool = Field(default=False, description="Whether academic degree is mandatory non-negotiable")
     strict_min_years: Optional[float] = Field(default=None, description="Strict non-negotiable minimum experience years threshold")
+    max_notice_period: Optional[str] = Field(default=None, description="Maximum acceptable notice period e.g. Immediate, 2 Weeks, 1 Month")
+    max_salary_budget: Optional[float] = Field(default=None, description="Maximum budget for salary expectation")
     hard_skills: List[str] = Field(default_factory=list, description="Must-have skills that are non-negotiable knockout criteria")
+
+class WeakCompetency(BaseModel):
+    """A technical or soft competency area where candidate proof is missing or insufficient."""
+    topic: str = Field(description="Competency domain e.g. Distributed Caching & Redis, System Architecture")
+    gap_description: str = Field(description="Why evidence is missing or shallow")
+    evidence_source: str = Field(description="Origin e.g. Resume Missing, Voice Interview Shallow Answer, Skill Weight Discrepancy")
+    severity: str = Field(default="High Probe", description="High Probe, Moderate Probe, Verification Only")
+
+class F2FInterviewQuestion(BaseModel):
+    """Targeted question proposed for Hiring Manager face-to-face interview."""
+    id: str = Field(description="Unique question ID")
+    competency: str = Field(description="Target skill or competency being probed")
+    question: str = Field(description="Exact probing question text for hiring manager to ask")
+    intent_and_focus: str = Field(description="What this question aims to evaluate")
+    what_to_look_for: str = Field(description="Key indicators of a strong answer vs. a red flag response")
+
+class HiringManagerBriefing(BaseModel):
+    """Stage 4 Agent Output: Tailored briefing for Hiring Manager On-Site / Face-to-Face Interview."""
+    candidate_id: str
+    candidate_name: str
+    job_id: str
+    job_title: str
+    stage1_summary: str = Field(default="", description="Stage 1 Job Requirements & Hard Limits Summary")
+    stage2_match_summary: str = Field(default="", description="Stage 2 Resume Match & Hard Criteria Status")
+    stage3_voice_summary: str = Field(default="", description="Stage 3 Voice Interview Performance Summary")
+    weak_competencies: List[WeakCompetency] = Field(default_factory=list, description="Identified areas requiring probing")
+    proposed_f2f_questions: List[F2FInterviewQuestion] = Field(default_factory=list, description="Targeted questions for face-to-face round")
+    hiring_manager_action_items: List[str] = Field(default_factory=list, description="Key verification checks for hiring manager")
+    generated_at: str = Field(default="", description="Timestamp when Stage 4 agent briefing was generated")
 
 class JDKeyRequirements(BaseModel):
     """Structured LLM-extracted requirements from a raw job description."""
@@ -117,6 +149,8 @@ class MatchAnalysis(BaseModel):
     is_top_candidate: bool = Field(default=False, description="Whether candidate is within top X target count for HR interview shortlist")
     rank_position: int = Field(default=1, description="Rank index among applicants")
     selection_status: str = Field(default="Applied", description="Current hiring status: Applied, Shortlisted for Interview, Selected, Rejected")
+    agent_execution_trace: Optional[Dict[str, Any]] = Field(default=None, description="Detailed 4-stage agent execution trace log")
+    hiring_manager_briefing: Optional[HiringManagerBriefing] = Field(default=None, description="Stage 4 Hiring Manager F2F Q&A Briefing payload")
 
 class CandidateRecord(BaseModel):
     id: str

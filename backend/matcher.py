@@ -518,25 +518,34 @@ Evaluate candidate fit holistically for HR decision making and return JSON with 
             query_text = f"{job_description.title} {' '.join(job_description.required_skills)} {' '.join(job_description.preferred_skills)} {job_description.description}"
             search_results = self.vector_store.search_candidates(query_text, top_k=top_k)
 
+        from backend.agents import MultiAgentOrchestrator
+        orchestrator = MultiAgentOrchestrator(self.vector_store)
+
         match_analyses = []
         for res in search_results:
             record: CandidateRecord = res["candidate_record"]
             similarity = res["similarity"]
             
-            skill_info = self.calculate_skill_match(
-                candidate_skills=record.profile.skills,
-                required_skills=job_description.required_skills,
-                preferred_skills=job_description.preferred_skills,
-                skill_weights=job_description.skill_weights
-            )
-
-            analysis = self.generate_hr_evaluation(
-                candidate_record=record,
-                job_description=job_description,
-                semantic_sim=similarity,
-                skill_info=skill_info
-            )
-            match_analyses.append(analysis)
+            try:
+                # Execute Stage 1 & Stage 2 Multi-Agent Orchestration Pipeline
+                analysis = orchestrator.orchestrate_matching_pipeline(record, job_description)
+                analysis.semantic_similarity = similarity
+                match_analyses.append(analysis)
+            except Exception as e:
+                print(f"Fallback to legacy matcher due to orchestrator error: {e}")
+                skill_info = self.calculate_skill_match(
+                    candidate_skills=record.profile.skills,
+                    required_skills=job_description.required_skills,
+                    preferred_skills=job_description.preferred_skills,
+                    skill_weights=job_description.skill_weights
+                )
+                analysis = self.generate_hr_evaluation(
+                    candidate_record=record,
+                    job_description=job_description,
+                    semantic_sim=similarity,
+                    skill_info=skill_info
+                )
+                match_analyses.append(analysis)
 
         match_analyses.sort(key=lambda x: x.match_score, reverse=True)
 
