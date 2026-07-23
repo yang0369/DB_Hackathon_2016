@@ -1,0 +1,246 @@
+{
+  "29c5d658971570e1fb05f8446c7fed746cc012c8f98aeff6d9c68f9c04a2b6de": {
+    "full_name": "Yunlong Jiao",
+    "email": "yljiao.ustc@gmail.com",
+    "phone": "+447400724281",
+    "location": "London, UK",
+    "summary": "Machine Learning Scientist with over 5 years of post-PhD experience in ML/AI. Strong skills in model development and performance evaluation, proficient in Python and deep learning frameworks, and experienced in incubating and delivering projects from proof-of-concept to production.",
+    "skills": [
+      "Natural Language Processing",
+      "Large Language Models",
+      "Deep Generative Models",
+      "Neural Text-to-Speech",
+      "Speech Synthesis",
+      "Machine Learning",
+      "Artificial Intelligence",
+      "Bias Mitigation",
+      "Fairness in AI",
+      "Privacy Preservation",
+      "Gaussian Processes",
+      "Time Series Forecasting",
+      "Multi-modality",
+      "Kernel Methods",
+      "Representation Learning",
+      "Graph Learning",
+      "Sparsity Regularisation",
+      "Information Extraction",
+      "Feature Engineering",
+      "Data Pipelines",
+      "Unsupervised Sentence-Pair Modelling",
+      "Self-and Mutual-Distillations",
+      "Neural Vocoding",
+      "Normalizing Flows",
+      "Python",
+      "PyTorch",
+      "MXNet",
+      "R",
+      "C/C++",
+      "numpy",
+      "pandas",
+      "scikit-learn",
+      "CUDA",
+      "Accelerated Computing",
+      "Cloud Computing",
+      "AWS",
+      "SageMaker",
+      "SQL",
+      "Bash",
+      "Git",
+      "Docker",
+      "Open Source",
+      "Unit/Integration Testing",
+      "CI/CD",
+      "Agile",
+      "Scrum"
+    ],
+    "experience": [
+      {
+        "title": "Machine Learning Scientist",
+        "company": "Amazon",
+        "duration": "Nov 2019 - Present",
+        "description": "Leading research on bias mitigation technologies in NLP and building/deploying ML solutions for Alexa Shopping. Previously developed a deep generative model for universal speech synthesis for Alexa Text-to-Speech Research team, scaling production across multiple regions."
+      },
+      {
+        "title": "Postdoctoral Research Scientist",
+        "company": "University of Oxford",
+        "duration": "Nov 2017 - Oct 2019",
+        "description": "Led research in a multi-organizational project developing novel methods for longitudinal modelling of complex disease using multi-modal data integration. Supervised master's theses in the Department of Statistics."
+      },
+      {
+        "title": "Doctoral Researcher",
+        "company": "PSL Research University",
+        "duration": "Sep 2013 - Sep 2017",
+        "description": "Researched kernel methods and representation learning of non-tabular data such as rank data and graphs. Applied findings to breast cancer survival prediction using genetic data. Placed 2nd in the DREAM Toxicogenetics Challenge."
+      },
+      {
+        "title": "Data Scientist Intern",
+        "company": "Roche Diagnostics GmbH",
+        "duration": "Apr 2015 - Jun 2015",
+        "description": "Proposed a data pipeline to process large-scale unstructured machinery performance data and built a predictive model for failure states in automated immunoassay analysers. Patented the solution."
+      }
+    ],
+    "education": [
+      {
+        "degree": "Doctor of Philosophy",
+        "institution": "Centre for Computational Biology, Paris Sciences et Lettres - PSL Research University",
+        "year": "2013 - 2017"
+      },
+      {
+        "degree": "Master of Science (Mention Très Bien)",
+        "institution": "Department of Mathematics, University of Paris-Saclay",
+        "year": "2012 - 2013"
+      },
+      {
+        "degree": "Bachelor of Science (First Class Honours)",
+        "institution": "Department of Mathematics, University of Science & Technology of China",
+        "year": "2008 - 2012"
+      }
+    ],
+    "certifications": [],
+    "years_of_experience": 6.5,
+    "availability": "Immediate",
+    "nationality": "UK (No Sponsorship Needed)"
+  },
+  "0ca5a21eaba5bca882c8b7c7761660b4c5189b934fc175eb685ac363d3555be8": {
+    "full_name": "JAMES CLARK",
+    "email": "support@qwikresume.com",
+    "phone": "(123) 456 7899",
+    "location": "Los Angeles",
+    "summary": "With 5 years as a Reliability Engineer, I specialize in enhancing equipment functionality and operational efficiency. My expertise in predictive maintenance and data analysis has driven significant improvements in system reliability. I am dedicated to implementing innovative solutions that align with industry standards and foster a culture of continuous improvement.",
+    "skills": [
+      "Data Analysis and Reporting",
+      "Technical Documentation",
+      "Presentation Development",
+      "Risk Assessment",
+      "Predictive Maintenance",
+      "Preventative Maintenance",
+      "Root Cause Failure Analysis (RCFA)",
+      "Life Cycle Cost Analysis",
+      "Pressure Vessels Inspection",
+      "Storage Tanks Inspection",
+      "Piping Systems Inspection",
+      "Regulatory Compliance",
+      "API 510 Inspection",
+      "Reliability Block Diagrams",
+      "Fault Tree Diagrams",
+      "Reliability Analysis",
+      "Probability of Loss Analysis",
+      "Failure Mode Effects and Criticality Analysis (FMECA)",
+      "Reliability-Centered Maintenance (RCM)",
+      "System Dynamics",
+      "Materials Science",
+      "Reliability Engineering"
+    ],
+    "experience": [
+      {
+        "title": "Reliability Engineer I",
+        "company": "Quantum Solutions LLC",
+        "duration": "Jan / 2021-Ongoing",
+        "description": "Conducted comprehensive reliability studies, providing actionable recommendations to enhance equipment performance and operational strategies. Led Root Cause Failure Analysis (RCFA) teams to diagnose equipment failures and develop effective maintenance protocols. Utilized historical data analysis to propose enhancements that minimized life cycle costs across diverse equipment classes. Formulated and assessed Predictive and Preventative Maintenance plans, ensuring their effectiveness for critical assets. Authored and reviewed inspection briefs for pressure vessels, storage tanks, and piping systems across multiple sites. Collaborated with external inspection teams to ensure regulatory compliance in pressure vessel and tank inspections. Served as an API 510 Certified Inspector, overseeing pressure vessel inspections and ensuring adherence to safety standards."
+      },
+      {
+        "title": "Reliability Engineer",
+        "company": "Lakeside Apparel Co",
+        "duration": "Jan / 2020-Jan / 2021",
+        "description": "Established a comprehensive Reliability Program, outlining specifications and resource allocations. Designed Reliability Block Diagrams and Fault Tree Diagrams to visualize system reliability and failure modes. Collaborated with corporate executives to develop innovative methodologies for Reliability Analysis. Executed detailed Reliability and Probability of Loss analyses on aerospace systems using advanced software tools. Conducted Failure Mode Effects and Criticality Analysis (FMECA) to identify potential failure impacts."
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelor of Science in Mechanical Engineering",
+        "institution": "University of Michigan",
+        "year": "Jan / 2019-Jan / 2020"
+      }
+    ],
+    "certifications": [
+      "API 510 Certified Inspector"
+    ],
+    "years_of_experience": 5.0,
+    "availability": "Immediate",
+    "nationality": "Any / Citizen"
+  },
+  "21c6f0b1eededbf2593e458b4cf854c4fc36f15b69e4d8c98b929f9e4562e90f": {
+    "full_name": "YUTIAN WANG",
+    "email": "yutianw@umich.edu",
+    "phone": "(734) 800-6952",
+    "location": "Ann Arbor, MI",
+    "summary": null,
+    "skills": [
+      "Python",
+      "MATLAB",
+      "R",
+      "SAS",
+      "Stata",
+      "C++",
+      "Bloomberg",
+      "Factset",
+      "Wind",
+      "LaTex",
+      "Excel",
+      "Word",
+      "PowerPoint",
+      "Quantitative Analysis",
+      "Quantitative Trading Models",
+      "Portfolio Optimization",
+      "Portfolio Construction",
+      "Backtesting",
+      "Risk Assessment",
+      "Risk Management",
+      "Asset Allocation",
+      "CAPM",
+      "Sharpe Ratio",
+      "Monte Carlo Simulation",
+      "Value at Risk (VaR)",
+      "Financial Modeling",
+      "Numerical Methods",
+      "Stochastic Analysis",
+      "Statistical Models",
+      "Data Analysis",
+      "Data Scraping",
+      "Data Cleaning",
+      "Image Processing",
+      "Generalized Stochastic Petri Net",
+      "Predictive Analysis",
+      "Financial Engineering",
+      "Financial Writing",
+      "Communication",
+      "English",
+      "Mandarin"
+    ],
+    "experience": [
+      {
+        "title": "Quantitative Analyst for Investment",
+        "company": "Huarong Securities",
+        "duration": "June 2017 – Sept. 2017",
+        "description": "Implemented quantitative trading models, developed and tested quant trading strategies using statistical & numerical methods and MATLAB & Python within all A-shares and H-shares to provide trading suggestions for clients. Designed and backtested optimization algorithms for portfolio construction and provided recommendations for clients. Researched newly introduced data terminals and quantitative databases to generalize them in department and applied them to initial practical use."
+      },
+      {
+        "title": "Analyst for Risk Management and Sales",
+        "company": "Bank of China",
+        "duration": "June 2016 – Sept. 2016",
+        "description": "Conducted risk assessment for real estate loans and improved risk management strategy by resolving identity information issues using MATLAB and image processing software and completed promptly for inspection. Advertised loan transaction and connected with clients, resulting in increased sales of main products by over 50%. Composed credit investigation materials for over 500 users and shorten the work period by half."
+      }
+    ],
+    "education": [
+      {
+        "degree": "Master of Science in Quantitative Finance and Risk Management",
+        "institution": "University of Michigan",
+        "year": "Sept. 2018 – May 2020"
+      },
+      {
+        "degree": "Bachelor of Economics in Financial Engineering",
+        "institution": "Wuhan University",
+        "year": "Sept. 2014 – June 2018"
+      }
+    ],
+    "certifications": [
+      "SAS Certified Advanced Programmer for SAS 9",
+      "SAS Certified Base Programmer for SAS 9",
+      "Midwest Case Competition 3rd Place",
+      "China Undergraduate Mathematical Contest in Modeling The second prize in Hubei Province"
+    ],
+    "years_of_experience": 0.5,
+    "availability": "Immediate",
+    "nationality": "Any / Citizen"
+  }
+}

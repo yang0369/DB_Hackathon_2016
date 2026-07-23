@@ -43,7 +43,9 @@ def fallback_parse_resume(raw_text: str, filename: str) -> CandidateProfile:
         "Django", "Flask", "SQL", "PostgreSQL", "MongoDB", "Docker", "Kubernetes",
         "AWS", "GCP", "Azure", "Git", "CI/CD", "REST API", "GraphQL", "Java", "C++",
         "HTML", "CSS", "Tailwind", "Machine Learning", "Deep Learning", "TensorFlow",
-        "PyTorch", "Data Analysis", "Pandas", "NumPy", "Scikit-Learn", "Agile", "Scrum"
+        "PyTorch", "Data Analysis", "Pandas", "NumPy", "Scikit-Learn", "Agile", "Scrum",
+        "Large Language Models", "LLM", "Generative AI", "GenAI", "Text-to-Speech", "TTS", 
+        "Prompt Engineering", "NLP", "Natural Language Processing", "Computer Vision"
     ]
     extracted_skills = []
     text_lower = raw_text.lower()
@@ -105,7 +107,17 @@ def fallback_parse_resume(raw_text: str, filename: str) -> CandidateProfile:
 
 
 def parse_resume_with_gemini(raw_text: str, filename: str) -> CandidateProfile:
-    """Parse raw resume text into structured CandidateProfile using Google free LLM models (gemini-1.5-flash)."""
+    """Parse raw resume text into structured CandidateProfile using Google free LLM models with persistent caching."""
+    # 1. Check persistent cache first
+    try:
+        from backend.cache import cache_manager
+        cached_profile = cache_manager.get_cached_resume(raw_text)
+        if cached_profile:
+            print(f"Cache hit for resume: {filename}")
+            return cached_profile
+    except Exception as e:
+        print(f"Resume cache lookup notice: {e}")
+
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     
     if not api_key or not GENAI_AVAILABLE:
@@ -119,6 +131,12 @@ def parse_resume_with_gemini(raw_text: str, filename: str) -> CandidateProfile:
     prompt = f"""
 You are an expert resume parser. Extract structured information from the following resume text into JSON matching the specified schema.
 Include candidate's full name, email, phone, location, skills, experience, education, total years of experience, availability (e.g. Immediate, 2 Weeks Notice, 1 Month Notice), and nationality or work authorization status.
+
+CRITICAL INSTRUCTIONS FOR SKILL EXTRACTION:
+- Extract an EXHAUSTIVE and COMPREHENSIVE list of all skills, tools, technologies, methodologies, domain expertise, and core competencies.
+- Do not just list 5-10 skills. Aim to extract 15-30+ keywords that accurately represent everything they are good at.
+- Actively identify and extract cutting-edge technologies, AI domain skills, and advanced methodologies (e.g., "Large Language Models", "Generative AI", "Text-to-Speech", "Prompt Engineering", "Machine Learning", "Data Pipelines").
+- If they used a tool or technique in their work experience, it MUST be included in the skills list.
 
 Resume Text:
 \"\"\"
@@ -144,13 +162,27 @@ Resume Text:
                     profile.availability = "Immediate"
                 if not profile.nationality:
                     profile.nationality = "Any / Citizen"
+                
+                # Store in persistent cache
+                try:
+                    from backend.cache import cache_manager
+                    cache_manager.set_cached_resume(raw_text, profile)
+                except Exception as e:
+                    print(f"Failed to save resume to cache: {e}")
+                    
                 return profile
         except Exception as e:
             err_str = str(e)
             if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                 break
     
-    return fallback_parse_resume(raw_text, filename)
+    fallback_res = fallback_parse_resume(raw_text, filename)
+    try:
+        from backend.cache import cache_manager
+        cache_manager.set_cached_resume(raw_text, fallback_res)
+    except Exception:
+        pass
+    return fallback_res
 
 
 

@@ -200,14 +200,83 @@ class CandidateMatcher:
         c_nat = cand_nat or "Any / Citizen"
         r_nat = req_nat or "Any"
 
-        if r_nat == "Any" or c_nat.lower() == r_nat.lower() or "any" in c_nat.lower():
+        if r_nat == "Any" or "any" in r_nat.lower() or c_nat.lower() == r_nat.lower() or "any" in c_nat.lower():
             return {"score": 100.0, "matched": True, "summary": f"Status match: {c_nat}"}
         elif ("singapore" in r_nat.lower() or "pr" in r_nat.lower()) and ("singapore" in c_nat.lower() or "pr" in c_nat.lower()):
             return {"score": 100.0, "matched": True, "summary": f"Matches Singapore Citizen/PR requirement"}
         elif ("us" in r_nat.lower() or "green card" in r_nat.lower()) and ("us" in c_nat.lower() or "green card" in c_nat.lower()):
             return {"score": 100.0, "matched": True, "summary": f"Matches US Work Authorization"}
         else:
-            return {"score": 70.0, "matched": True, "summary": f"Status: {c_nat} (Job requires {r_nat})"}
+            return {"score": 0.0, "matched": False, "summary": f"Status mismatch: '{c_nat}' (Job requires '{r_nat}')"}
+
+    def calculate_academic_match(self, candidate_education: List[Any], required_education: Optional[str], academic_qualifications: List[str]) -> Dict[str, Any]:
+        """Evaluate candidate academic background against required education level and degree qualifications."""
+        if not required_education and not academic_qualifications:
+            return {"score": 100.0, "summary": "No specific academic restriction specified"}
+
+        degrees_text = " ".join([f"{e.degree or ''} {e.institution or ''}".lower() for e in candidate_education])
+        req_edu_lower = (required_education or "").lower()
+
+        if "master" in req_edu_lower or "phd" in req_edu_lower:
+            if "master" in degrees_text or "phd" in degrees_text or "doctor" in degrees_text:
+                return {"score": 100.0, "summary": f"Meets advanced degree requirement ({required_education})"}
+            elif "bachelor" in degrees_text or "bs" in degrees_text or "ba" in degrees_text:
+                return {"score": 75.0, "summary": f"Holds Bachelor's (Job prefers {required_education})"}
+            else:
+                return {"score": 60.0, "summary": f"Educational background below preferred {required_education}"}
+
+        if "bachelor" in req_edu_lower or "degree" in req_edu_lower:
+            if "bachelor" in degrees_text or "master" in degrees_text or "phd" in degrees_text or "bs" in degrees_text or "ba" in degrees_text or len(candidate_education) > 0:
+                return {"score": 100.0, "summary": "Meets Bachelor's Degree requirement"}
+            else:
+                return {"score": 70.0, "summary": "Degree not explicitly confirmed on resume"}
+
+        return {"score": 100.0, "summary": "Academic background acceptable"}
+
+    def evaluate_hard_criteria(
+        self,
+        candidate_record: CandidateRecord,
+        job_description: JobDescription,
+        missing_skills: List[str]
+    ) -> Dict[str, Any]:
+        """Evaluate non-negotiable hard criteria (knockout filters). Returns passed status and disqualification reasons."""
+        profile = candidate_record.profile
+        reasons = []
+
+        # 1. Nationality / Work Authorization Hard Criterion
+        req_nat = job_description.required_nationality or "Any"
+        if job_description.hard_criteria and job_description.hard_criteria.mandatory_nationality:
+            if job_description.hard_criteria.mandatory_nationality != "Any":
+                req_nat = job_description.hard_criteria.mandatory_nationality
+
+        if req_nat != "Any" and "any" not in req_nat.lower():
+            nat_match = self.calculate_nationality_match(profile.nationality, req_nat)
+            if not nat_match["matched"]:
+                reasons.append(f"Disqualified: Candidate status '{profile.nationality or 'Unknown'}' does not match required mandatory nationality/work authorization '{req_nat}'")
+
+        # 2. Hard Mandatory Skills Knockout
+        if job_description.hard_criteria and job_description.hard_criteria.hard_skills:
+            for hard_s in job_description.hard_criteria.hard_skills:
+                if any(is_skill_match(cs, hard_s) for cs in profile.skills) is False:
+                    reasons.append(f"Disqualified: Missing mandatory non-negotiable skill '{hard_s}'")
+
+        # 3. Strict Minimum Years Threshold
+        if job_description.hard_criteria and job_description.hard_criteria.strict_min_years:
+            strict_years = job_description.hard_criteria.strict_min_years
+            cand_years = profile.years_of_experience or 0.0
+            if cand_years < strict_years:
+                reasons.append(f"Disqualified: Experience of {cand_years:.1f} Yrs is below strict minimum requirement of {strict_years:.1f} Yrs")
+
+        # 4. Mandatory Degree Threshold
+        if job_description.hard_criteria and job_description.hard_criteria.strict_degree_required:
+            if not profile.education or len(profile.education) == 0:
+                reasons.append(f"Disqualified: Mandatory academic degree required but candidate has no verified degree listed")
+
+        passed = len(reasons) == 0
+        return {
+            "passed": passed,
+            "reasons": reasons
+        }
 
     def generate_hr_evaluation(
         self,
@@ -228,35 +297,56 @@ class CandidateMatcher:
         weighted_skill_score = skill_info["weighted_skill_score"]
         skill_breakdown = skill_info["skill_scores_breakdown"]
 
+        # Evaluate Hard Criteria / Knockout filters
+        hard_eval = self.evaluate_hard_criteria(candidate_record, job_description, missing_skills)
+        hard_passed = hard_eval["passed"]
+        disqual_reasons = hard_eval["reasons"]
+
         qual_info = self.calculate_qualification_match(
             candidate_exp_years=profile.years_of_experience,
             min_years_exp=job_description.min_years_experience
         )
         qual_score = qual_info["qualification_score"]
 
+        academic_info = self.calculate_academic_match(
+            candidate_education=profile.education,
+            required_education=job_description.education_level,
+            academic_qualifications=job_description.academic_qualifications or []
+        )
+        academic_score = academic_info["score"]
+
         avail_info = self.calculate_availability_match(profile.availability, job_description.required_availability)
         nat_info = self.calculate_nationality_match(profile.nationality, job_description.required_nationality)
 
-        # Composite Match Score: 55% Weighted Skills + 25% Qualification/Experience + 10% Availability + 10% Nationality
-        composite_score = round(
-            (weighted_skill_score * 0.55) +
-            (qual_score * 0.25) +
-            (avail_info["score"] * 0.10) +
-            (nat_info["score"] * 0.10),
-            1
-        )
+        # Composite Match Score: 50% Weighted Skills + 20% Experience + 15% Academic + 15% Availability/Nationality
+        if hard_passed:
+            composite_score = round(
+                (weighted_skill_score * 0.50) +
+                (qual_score * 0.20) +
+                (academic_score * 0.15) +
+                (avail_info["score"] * 0.08) +
+                (nat_info["score"] * 0.07),
+                1
+            )
+        else:
+            # Penalize match score for knocked-out candidates
+            composite_score = 0.0
 
         strengths = []
-        if matched_skills:
+        if matched_skills and hard_passed:
             strengths.append(f"Matched {len(matched_skills)} required skills (Weighted Score: {weighted_skill_score}%)")
-        if pref_matched:
+        if pref_matched and hard_passed:
             strengths.append(f"Matched preferred skills: {', '.join(pref_matched[:3])}")
-        if qual_info["experience_met"]:
+        if qual_info["experience_met"] and hard_passed:
             strengths.append(f"Experience: {qual_info['experience_summary']}")
-        if avail_info["matched"]:
+        if academic_score >= 80.0 and hard_passed:
+            strengths.append(f"Academic fit: {academic_info['summary']}")
+        if avail_info["matched"] and hard_passed:
             strengths.append(f"Availability: {avail_info['summary']}")
 
         gaps = []
+        if not hard_passed:
+            gaps.extend(disqual_reasons)
         if missing_skills:
             gaps.append(f"Missing required skills: {', '.join(missing_skills)}")
         if not qual_info["experience_met"]:
@@ -266,9 +356,12 @@ class CandidateMatcher:
         if not gaps:
             gaps.append("No major skill, experience, or availability gaps identified.")
 
-        if composite_score >= 75.0 and qual_info["experience_met"] and skill_coverage >= 50.0:
+        if not hard_passed:
+            hr_rec = "Disqualified (Hard Criteria)"
+            summary_proposal = f"Candidate knocked out by mandatory hard criteria: {'; '.join(disqual_reasons)}"
+        elif composite_score >= 75.0 and qual_info["experience_met"] and skill_coverage >= 50.0:
             hr_rec = "Highly Recommended"
-            summary_proposal = f"Strong candidate for {job_description.title}. High weighted skill match ({weighted_skill_score}%) and meets qualification & availability requirements."
+            summary_proposal = f"Strong candidate for {job_description.title}. High weighted skill match ({weighted_skill_score}%) and satisfies academic & experience criteria."
         elif composite_score >= 50.0:
             hr_rec = "Consider for Interview"
             summary_proposal = f"Moderate fit for {job_description.title}. Meets core requirements with minor skill or experience gaps."
@@ -276,7 +369,26 @@ class CandidateMatcher:
             hr_rec = "Skip / Low Match"
             summary_proposal = f"Low alignment with {job_description.title}. Does not satisfy weighted skill and experience requirements."
 
-        if api_key and GENAI_AVAILABLE:
+        # Check persistent evaluation cache
+        cand_text = candidate_record.raw_text or f"{profile.full_name} {' '.join(profile.skills)}"
+        jd_text = job_description.raw_text or f"{job_description.title} {job_description.description}"
+
+        cached_eval = None
+        try:
+            from backend.cache import cache_manager
+            cached_eval = cache_manager.get_cached_eval(cand_text, jd_text)
+        except Exception:
+            pass
+
+        llm_match_score = 0.0
+
+        if cached_eval and hard_passed:
+            hr_rec = cached_eval.get("hr_recommendation", hr_rec)
+            summary_proposal = cached_eval.get("summary_rationale", summary_proposal)
+            strengths = cached_eval.get("strengths", strengths)
+            gaps = cached_eval.get("gaps", gaps)
+            llm_match_score = cached_eval.get("llm_match_score", composite_score)
+        elif api_key and GENAI_AVAILABLE and hard_passed:
             free_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
             client = genai.Client(api_key=api_key)
             prompt = f"""
@@ -299,11 +411,12 @@ Match Analysis:
 - Missing Skills: {', '.join(missing_skills)}
 - Experience Fit: {qual_info['experience_summary']}
 
-Evaluate candidate fit for HR decision making and return JSON with keys:
+Evaluate candidate fit holistically for HR decision making and return JSON with keys:
 - hr_recommendation: string ("Highly Recommended", "Consider for Interview", "Skip / Low Match")
 - strengths: list of strings
 - gaps: list of strings
 - summary_rationale: string (2-3 sentences explaining rationale for HR interview selection)
+- llm_match_score: float (0 to 100, representing your holistic evaluation of their fit based on skills, domain expertise, and experience)
 """
             for model_name in free_models:
                 try:
@@ -318,36 +431,55 @@ Evaluate candidate fit for HR decision making and return JSON with keys:
                     if response.text:
                         eval_data = json.loads(response.text)
                         hr_rec = eval_data.get("hr_recommendation", hr_rec)
+                        summary_proposal = eval_data.get("summary_rationale", summary_proposal)
                         strengths = eval_data.get("strengths", strengths)
                         gaps = eval_data.get("gaps", gaps)
-                        summary_proposal = eval_data.get("summary_rationale", summary_proposal)
+                        llm_match_score = float(eval_data.get("llm_match_score", composite_score))
+
+                        # Save to persistent eval cache
+                        try:
+                            from backend.cache import cache_manager
+                            cache_manager.set_cached_eval(cand_text, jd_text, {
+                                "hr_recommendation": hr_rec,
+                                "summary_rationale": summary_proposal,
+                                "strengths": strengths,
+                                "gaps": gaps,
+                                "llm_match_score": llm_match_score
+                            })
+                        except Exception:
+                            pass
                         break
                 except Exception as e:
                     err_str = str(e)
                     if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                        # Rate limit reached for free tier; use structured scoring engine without spamming logs
                         break
 
-
+        # Calculate hybrid match score (50% rule-based composite, 50% LLM match)
+        hybrid_match_score = round((composite_score + llm_match_score) / 2, 1) if hard_passed else 0.0
 
         return MatchAnalysis(
             candidate_id=candidate_record.id,
             candidate_name=profile.full_name,
             job_id=job_description.id or "custom-job",
             job_title=job_description.title,
-            match_score=composite_score,
+            match_score=hybrid_match_score,
+            rule_based_score=composite_score,
+            llm_match_score=llm_match_score,
             semantic_similarity=semantic_sim,
             skill_coverage=skill_coverage,
             skill_match_score=skill_score,
             weighted_skill_score=weighted_skill_score,
             skill_scores_breakdown=skill_breakdown,
             qualification_score=qual_score,
+            academic_score=academic_score,
             availability_score=avail_info["score"],
             availability_matched=avail_info["matched"],
             candidate_availability=profile.availability or "Immediate",
             nationality_score=nat_info["score"],
             nationality_matched=nat_info["matched"],
             candidate_nationality=profile.nationality or "Any",
+            hard_criteria_passed=hard_passed,
+            disqualification_reasons=disqual_reasons,
             matched_skills=matched_skills,
             missing_skills=missing_skills,
             preferred_matched_skills=pref_matched,

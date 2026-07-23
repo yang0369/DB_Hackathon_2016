@@ -1,0 +1,44 @@
+{
+  "79eaa42c8061bb738acbf3d89bdf1ba58e2cd897a3685b6c1fad61dcc77f3cbe": {
+    "hr_recommendation": "Highly Recommended",
+    "summary_rationale": "Yunlong Jiao demonstrates exceptional technical depth with 6.5 years of experience across advanced AI disciplines, data pipelines, and production infrastructure. Despite a minor gap in GCP experience, his strong proficiency in AWS, Azure, Python, and SQL makes him an outstanding candidate for the AI Engineer position. Given the target shortlist count of 1, he is highly recommended for an interview.",
+    "strengths": [
+      "Extensive experience of 6.5 years in AI/ML, exceeding the 3-year requirement",
+      "Strong technical match in core required skills including Python, SQL, AWS, and Cloud Computing",
+      "Deep expertise in advanced AI domains such as Large Language Models, NLP, and Data Pipelines"
+    ],
+    "gaps": [
+      "Lacks explicit Google Cloud Platform (GCP) experience among the target cloud skills"
+    ],
+    "llm_match_score": 88.5
+  },
+  "d99bdc7deb3d03007732008a9344d710137da8e00de6dac1f199f8f72b3070b7": {
+    "hr_recommendation": "Skip / Low Match",
+    "summary_rationale": "James Clark lacks all of the core technical skills required for the AI Engineer position, including Python, SQL, and major cloud platforms. His professional background is in reliability and mechanical engineering, which does not align with the software and machine learning engineering needs of this role. Therefore, he is not recommended for an interview.",
+    "strengths": [
+      "Meets the minimum total experience requirement with 5.0 years of professional background",
+      "Has experience in predictive maintenance, risk assessment, and data analysis"
+    ],
+    "gaps": [
+      "Completely lacks required programming and database skills (Python, SQL)",
+      "Missing all specified cloud infrastructure experience (AWS, GCP, Azure)",
+      "Background is concentrated in mechanical and reliability engineering rather than AI/ML software development"
+    ],
+    "llm_match_score": 10.0
+  },
+  "c7b61385e90951e5f9bd1b083023f31f6a52b14139901e85b1a43ebe18675267": {
+    "hr_recommendation": "Skip / Low Match",
+    "summary_rationale": "While YUTIAN WANG has strong quantitative modeling and Python skills, the profile lacks essential technical capabilities such as SQL and major cloud platform competencies (AWS/GCP). Furthermore, with only six months of experience compared to the 3.0 years required for this regional AI engineering role, the candidate does not meet the necessary threshold for production-level AI deployment. It is recommended to skip this applicant for this specific role.",
+    "strengths": [
+      "Strong background in quantitative analysis, financial engineering, and statistical modeling.",
+      "Proficient in Python along with advanced data processing tools such as MATLAB, R, and C++.",
+      "Immediate availability for deployment in the Singapore office."
+    ],
+    "gaps": [
+      "Missing critical technical requirements including SQL, AWS, and GCP expertise.",
+      "Significantly short on experience, possessing only 0.5 years against the required 3.0 years.",
+      "Profile leans more toward quantitative finance and backtesting rather than core AI software engineering, ML infrastructure, and data pipeline deployment."
+    ],
+    "llm_match_score": 38.0
+  }
+}

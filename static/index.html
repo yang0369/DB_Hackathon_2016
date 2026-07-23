@@ -1,353 +1,378 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MatchAI Pro - AI Job & Candidate Matcher Portal</title>
+  <title>HiringAid@10x — AI-Powered Candidate Matching</title>
+  <meta name="description"
+    content="AI-powered HR portal — post jobs, extract requirements with LLM, and rank candidates from your talent pool automatically.">
   <link rel="stylesheet" href="/static/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
 </head>
+
 <body>
   <div class="app-container">
-    <!-- Header with Role Switcher -->
+
+    <!-- ── Header ────────────────────────────────────── -->
     <header>
       <div class="logo-container">
         <div class="logo-icon">⚡</div>
         <div class="logo-text">
-          <h1>MatchAI Pro</h1>
-          <span>AI Job & Applicant Matching Portal</span>
+          <h1>HiringAid@10x</h1>
+          <span>Profile Shortlisting System</span>
         </div>
       </div>
 
-      <div style="display: flex; gap: 12px; align-items: center;">
-        <button id="apiKeyBtn" class="btn-secondary" style="font-size: 0.82rem; padding: 6px 14px;" onclick="openApiKeyModal()">
-          🔑 API Key: Loading...
-        </button>
-
-        <!-- Role Switcher Toggle -->
+      <div style="display:flex; gap:10px; align-items:center;">
         <div class="role-switcher">
-          <button id="roleHrBtn" class="role-btn active" onclick="switchPortalRole('hr')">
-            💼 HR Manager Portal
-          </button>
-          <button id="roleSeekerBtn" class="role-btn" onclick="switchPortalRole('seeker')">
-            👤 Job Seeker Portal
-          </button>
+          <button id="roleHrBtn" class="role-btn active" onclick="switchPortalRole('hr')">💼 HR Manager</button>
+          <button id="roleSeekerBtn" class="role-btn" onclick="switchPortalRole('seeker')">👤 Job Seeker</button>
         </div>
       </div>
     </header>
 
 
-    <!-- ==================== HR MANAGER PORTAL ==================== -->
+    <!-- ══════════════════════════════════════════════
+       HR MANAGER PORTAL
+  ══════════════════════════════════════════════ -->
     <div id="hrPortalView" class="portal-view active">
-      <nav class="sub-nav" style="margin-bottom: 24px;">
-        <button class="nav-btn active" onclick="switchHrTab('hrPostTab', this)">
-          📝 1. Post Job Position
-        </button>
-        <button class="nav-btn" onclick="switchHrTab('hrApplicantsTab', this)">
-          🏆 2. Applicants & Analytics
-        </button>
-        <button class="nav-btn" onclick="switchHrTab('hrRepositoryTab', this)">
-          📁 3. Candidate Directory
-        </button>
+
+      <nav class="sub-nav">
+        <button class="nav-btn active" onclick="switchHrTab('hrPostTab', this)">📝 Post Job</button>
+        <button class="nav-btn" onclick="switchHrTab('hrApplicantsTab', this)">🏆 Rank &amp; Analyze</button>
+        <button class="nav-btn" onclick="switchHrTab('hrRepositoryTab', this)">📁 Candidate Pool</button>
       </nav>
 
       <!-- HR Tab 1: Post Job Position -->
       <div id="hrPostTab" class="tab-content active">
         <div class="glass-panel">
-          <div class="panel-title">💼 Post Job Position (AI LLM Auto-Extracts Skills & Qualifications)</div>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
-            Simply paste or type the job description, key responsibilities, and qualifications below. Our Google AI LLM backend will automatically extract key skills, required experience, education level, skill weights, and score all candidates!
+          <div class="panel-title">📝 Post Job &amp; Extract Requirements via AI</div>
+          <p style="color:var(--text-500); font-size:0.85rem; margin-bottom:20px; line-height:1.6;">
+            Paste your job description below. The AI will extract key skills, required experience, qualifications, and
+            scoring weights — then immediately rank your entire candidate pool.
           </p>
 
-          <div id="modeFormContainer">
-            <div class="grid-2">
-              <div class="form-group">
-                <label>Job Position Title *</label>
-                <input type="text" id="customJdTitle" class="form-control" placeholder="e.g. Senior Python Backend Engineer">
-              </div>
-              <div class="form-group">
-                <label>Department</label>
-                <input type="text" id="customJdDept" class="form-control" placeholder="e.g. Engineering">
-              </div>
-            </div>
-
+          <div class="grid-2">
             <div class="form-group">
-              <label>Full Job Description, Key Responsibilities, Skills & Qualifications *</label>
-              <textarea id="customJdDesc" class="form-control" rows="8" placeholder="Paste full job posting here (e.g. Responsibilities: Design FastAPI microservices, optimize SQL queries. Requirements: 4+ years Python, Docker, REST API, Bachelor's in CS...)"></textarea>
+              <label>Job Title *</label>
+              <input type="text" id="customJdTitle" class="form-control"
+                placeholder="e.g. Senior Python Backend Engineer">
             </div>
+            <div class="form-group">
+              <label>Department</label>
+              <input type="text" id="customJdDept" class="form-control" placeholder="e.g. Engineering">
+            </div>
+          </div>
 
-            <div class="grid-3">
-              <div class="form-group">
-                <label>Target Top Candidates for Interview ($X$) *</label>
-                <input type="number" id="customJdTargetCount" class="form-control" value="3" min="1" max="20">
-              </div>
-              <div class="form-group">
-                <label>Estimated Salary Min ($ / Year)</label>
-                <input type="number" id="customJdSalMin" class="form-control" value="120000" step="5000">
-              </div>
-              <div class="form-group">
-                <label>Estimated Salary Max ($ / Year)</label>
-                <input type="number" id="customJdSalMax" class="form-control" value="160000" step="5000">
-              </div>
-            </div>
+          <div class="form-group">
+            <label>Full Job Description *</label>
+            <textarea id="customJdDesc" class="form-control" rows="8"
+              placeholder="Paste the full job posting here — responsibilities, required skills, qualifications, years of experience, education level..."></textarea>
+          </div>
 
-            <div style="margin-top: 20px;">
-              <button class="btn-primary" style="padding: 12px 28px; font-size: 1rem; background: linear-gradient(135deg, #06b6d4 0%, #6366f1 50%, #8b5cf6 100%);" onclick="autoExtractJobDetailsWithLLM()">
-                🤖 Publish Job & Auto-Extract Criteria via Google AI LLM
-              </button>
-              <span id="aiPublishStatus" style="margin-left: 14px; font-weight: 600; font-size: 0.9rem; color: var(--accent-cyan);"></span>
+          <div class="grid-3">
+            <div class="form-group">
+              <label>Target Interview Count</label>
+              <input type="number" id="customJdTargetCount" class="form-control" value="3" min="1" max="20">
             </div>
+            <div class="form-group">
+              <label>Salary Min ($/yr)</label>
+              <input type="number" id="customJdSalMin" class="form-control" value="120000" step="5000">
+            </div>
+            <div class="form-group">
+              <label>Salary Max ($/yr)</label>
+              <input type="number" id="customJdSalMax" class="form-control" value="160000" step="5000">
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
+            <button class="btn-primary" style="padding:11px 24px;" onclick="autoExtractJobDetailsWithLLM()">
+              🤖 Publish &amp; Auto-Extract with AI
+            </button>
+            <span id="aiPublishStatus" style="font-size:0.85rem; color:var(--cyan); font-weight:600;"></span>
+          </div>
+
+          <!-- Extracted Criteria Preview -->
+          <div id="extractedCriteriaPanel"
+            style="display:none; margin-top:28px; border-top:1px solid var(--border); padding-top:22px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+              <div
+                style="width:32px;height:32px;border-radius:8px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">
+                🧠</div>
+              <div>
+                <div style="font-weight:700; color:var(--text-100); font-size:0.95rem;">AI-Extracted Job Requirements
+                </div>
+                <div style="color:var(--text-500); font-size:0.8rem;">Review before candidates are ranked</div>
+              </div>
+            </div>
+            <div id="extractedCriteriaContent"></div>
           </div>
         </div>
       </div>
 
-      <!-- HR Tab 2: HR Analytics Dashboard & Applicants Leaderboard -->
+      <!-- HR Tab 2: Rank & Analytics -->
       <div id="hrApplicantsTab" class="tab-content">
-        <div class="glass-panel" style="margin-bottom: 24px;">
-          <div class="panel-title">💼 Select Job Opening to Evaluate & Analyze Candidates</div>
-          <div style="display: flex; gap: 16px; align-items: center;">
-            <select id="jobSelect" class="job-selector" style="margin-bottom: 0;" onchange="loadSelectedJobApplicants()">
-              <option value="">-- Select Target Job Opening --</option>
-            </select>
-            <button class="btn-primary" onclick="loadSelectedJobApplicants()" style="white-space: nowrap;">
-              📊 Load Analytics & Rank Applicants
-            </button>
+
+        <!-- Job Selector Card -->
+        <div class="glass-panel" style="margin-bottom:16px;">
+          <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+              <div
+                style="font-size:0.75rem;font-weight:600;color:var(--text-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+                Select Job Opening</div>
+              <select id="jobSelect" class="job-selector" style="margin-bottom:0;"
+                onchange="loadSelectedJobApplicants()">
+                <option value="">— Select a job position —</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="loadSelectedJobApplicants()">📊 Load Rankings</button>
           </div>
 
-          <div id="jobDetailsCard" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); display: none; margin-top: 16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <h3 id="jdTitle" style="color: #fff; font-size: 1.1rem;"></h3>
+          <!-- Job Detail Strip (hidden until selected) -->
+          <div id="jobDetailsCard"
+            style="display:none; margin-top:16px; padding:14px; background:rgba(8,14,30,0.5); border-radius:10px; border:1px solid var(--border);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+              <h3 id="jdTitle" style="color:#fff; font-size:1rem; font-weight:700;"></h3>
               <span id="jdSalaryBadge" class="salary-badge"></span>
             </div>
-            <p id="jdDesc" style="color: var(--text-muted); font-size: 0.9rem; margin: 8px 0;"></p>
-            <div style="font-size: 0.85rem; color: var(--text-sub);">
-              <strong>Required Skills:</strong> <span id="jdSkillsList"></span> | 
-              <strong>Target Candidates for Interview ($X$):</strong> <span id="jdTargetCountBadge" style="color: var(--accent-cyan); font-weight:700;"></span> | 
-              <strong>Availability Required:</strong> <span id="jdAvailBadge" style="color: var(--accent-amber); font-weight:700;"></span> | 
-              <strong>Nationality Req:</strong> <span id="jdNatBadge" style="color: var(--accent-emerald); font-weight:700;"></span>
+            <p id="jdDesc"
+              style="color:var(--text-500); font-size:0.82rem; margin:8px 0; line-height:1.5; max-height:48px; overflow:hidden;">
+            </p>
+            <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:0.8rem; margin-top:4px;">
+              <span style="color:var(--text-500);">Skills: <strong style="color:var(--text-300);"
+                  id="jdSkillsList"></strong></span>
+              <span style="color:var(--text-500);">Target: <strong style="color:var(--cyan);"
+                  id="jdTargetCountBadge"></strong></span>
+              <span style="color:var(--text-500);">Availability: <strong style="color:var(--amber);"
+                  id="jdAvailBadge"></strong></span>
+              <span style="color:var(--text-500);">Nationality: <strong style="color:var(--emerald);"
+                  id="jdNatBadge"></strong></span>
             </div>
           </div>
         </div>
 
-        <!-- HR Analytics KPI Summary -->
-        <div id="analyticsKpiContainer" class="analytics-grid" style="display: none;">
+        <!-- KPI Strip -->
+        <div id="analyticsKpiContainer" class="analytics-grid" style="display:none;">
           <div class="kpi-card">
-            <div class="kpi-label">Total Applicants</div>
+            <div class="kpi-label">Total Ranked</div>
             <div id="kpiTotalApps" class="kpi-value">0</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Interview Target ($X$)</div>
+            <div class="kpi-label">Interview Target</div>
             <div id="kpiTargetCount" class="kpi-value">0</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Shortlisted for Interview</div>
+            <div class="kpi-label">Shortlisted</div>
             <div id="kpiShortlisted" class="kpi-value">0</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Top Candidate Avg Score</div>
+            <div class="kpi-label">Top Avg Score</div>
             <div id="kpiAvgTopScore" class="kpi-value">0%</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Skill Weight Index</div>
+            <div class="kpi-label">Skill Index</div>
             <div id="kpiSkillIndex" class="kpi-value">0%</div>
           </div>
         </div>
 
-        <!-- Visual Analytics Chart & Comparison Container -->
-        <div id="visualAnalyticsPanel" class="glass-panel" style="display: none; margin-bottom: 24px;">
-          <div class="panel-title">📊 Top Candidates Weighted Skill Breakdown & Comparison</div>
-          <div id="chartContainer" style="min-height: 180px; padding: 10px;">
-            <!-- SVG / HTML Skill Score Breakdown Chart inserted by JS -->
-          </div>
+        <!-- Skills chart for top candidates -->
+        <div id="visualAnalyticsPanel" class="glass-panel" style="display:none; margin-bottom:16px;">
+          <div class="panel-title">📊 Top Candidates — Score Comparison</div>
+          <div id="chartContainer"></div>
         </div>
 
-        <!-- Applicant Leaderboard -->
+        <!-- Ranking Mode Toggle + Leaderboard -->
         <div class="glass-panel">
-          <div class="panel-title">🏆 Candidate Ranking Leaderboard & Interview Shortlist</div>
+          <div
+            style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+            <div class="panel-title" style="margin-bottom:0;">🏆 Candidate Ranking</div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:0.78rem; color:var(--text-500); font-weight:600;">Scope:</span>
+              <button id="rankModePoolBtn" class="btn-primary" style="font-size:0.78rem;padding:5px 13px;"
+                onclick="setRankingMode('pool')">🏊 All Pool</button>
+              <button id="rankModeApplicantsBtn" class="btn-secondary" style="font-size:0.78rem;padding:5px 13px;"
+                onclick="setRankingMode('applicants')">📋 Applicants Only</button>
+              <span id="rankingModeLabel" style="font-size:0.78rem; color:var(--cyan); font-weight:600;"></span>
+            </div>
+          </div>
           <div id="leaderboardContainer">
-            <p style="color: var(--text-muted); text-align: center; padding: 30px;">
-              Select a Job Position above to evaluate applicants and view AI suggestions.
-            </p>
+            <div style="text-align:center; padding:40px 20px; color:var(--text-500);">
+              Select a job position above to rank candidates.
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- HR Tab 3: Candidate Directory Repository -->
+      <!-- HR Tab 3: Candidate Pool -->
       <div id="hrRepositoryTab" class="tab-content">
         <div class="glass-panel">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <div class="panel-title" style="margin-bottom:0;">📁 Candidate Directory Repository</div>
-            <button class="btn-secondary" onclick="loadCandidatesList()">🔄 Refresh List</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+            <div class="panel-title" style="margin-bottom:0;">📁 Candidate Pool</div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-secondary" onclick="syncCandidatePool()">🔄 Sync Pool Folder</button>
+              <button class="btn-secondary" style="border-color:rgba(244,63,94,0.3); color:#fca5a5;" onclick="clearCandidatePool()">🗑️ Purge Vector DB</button>
+            </div>
           </div>
           <div id="candidatesListTable">
-            <p style="color: var(--text-muted);">Loading candidate records...</p>
+            <div style="color:var(--text-500); text-align:center; padding:30px;">Loading candidates...</div>
           </div>
         </div>
       </div>
     </div>
 
 
-
-
-
-    <!-- ==================== JOB SEEKER PORTAL ==================== -->
+    <!-- ══════════════════════════════════════════════
+       JOB SEEKER PORTAL
+  ══════════════════════════════════════════════ -->
     <div id="seekerPortalView" class="portal-view">
+
       <nav class="sub-nav">
-        <button class="nav-btn active" onclick="switchSeekerTab('seekerUploadTab', this)">
-          📄 Upload Resume & Profile
-        </button>
-        <button class="nav-btn" onclick="switchSeekerTab('seekerJobsTab', this)">
-          💼 Browse & Apply for Jobs
-        </button>
-        <button class="nav-btn" onclick="switchSeekerTab('seekerAppsTab', this)">
-          📋 My Applications
-        </button>
+        <button class="nav-btn active" onclick="switchSeekerTab('seekerUploadTab', this)">📄 Upload Resume</button>
+        <button class="nav-btn" onclick="switchSeekerTab('seekerJobsTab', this)">💼 Browse Jobs</button>
+        <button class="nav-btn" onclick="switchSeekerTab('seekerAppsTab', this)">📋 My Applications</button>
       </nav>
 
-      <!-- Seeker Tab 1: Upload Resume -->
+      <!-- Upload Tab -->
       <div id="seekerUploadTab" class="tab-content active">
         <div class="grid-2">
           <div class="glass-panel">
-            <div class="panel-title">📄 Upload Your Resume (PDF / DOCX)</div>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
-              Upload your resume to extract skills, experience, and work history automatically. Once uploaded, you can apply for active job openings.
+            <div class="panel-title">📄 Upload Resume</div>
+            <p style="color:var(--text-500); font-size:0.83rem; margin-bottom:18px; line-height:1.5;">
+              Upload your CV (PDF, DOCX, TXT). AI extracts your skills, experience, and profile automatically.
             </p>
-
             <div id="dropzone" class="dropzone" onclick="document.getElementById('fileInput').click()">
               <div class="dropzone-icon">☁️</div>
-              <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 6px;">Drag & Drop Resume PDF Here</h3>
-              <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 16px;">or click to browse files (PDF, DOCX, TXT)</p>
-              <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleFileSelect(event)">
-              <button class="btn-primary" type="button">Select Resume File</button>
+              <div style="font-weight:700; color:#fff; margin-bottom:6px;">Drop your resume here</div>
+              <div style="color:var(--text-500); font-size:0.82rem; margin-bottom:16px;">PDF · DOCX · TXT</div>
+              <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt" style="display:none"
+                onchange="handleFileSelect(event)">
+              <button class="btn-primary" type="button">Browse File</button>
             </div>
-
-            <div id="uploadStatus" style="margin-top: 16px; font-weight: 600; display: none;"></div>
+            <div id="uploadStatus" style="margin-top:14px; font-weight:600; font-size:0.87rem; display:none;"></div>
           </div>
 
           <div class="glass-panel">
-            <div class="panel-title">✨ My Extracted Profile Preview</div>
-            <div id="parsedProfileContainer" style="color: var(--text-muted); text-align: center; padding: 40px 10px;">
-              No resume uploaded yet. Select or drop a file to create your candidate profile.
+            <div class="panel-title">✨ Extracted Profile</div>
+            <div id="parsedProfileContainer"
+              style="color:var(--text-500); text-align:center; padding:40px 10px; font-size:0.87rem;">
+              Upload a resume to see your extracted profile here.
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Seeker Tab 2: Browse & Apply Jobs -->
+      <!-- Browse Jobs Tab -->
       <div id="seekerJobsTab" class="tab-content">
         <div class="glass-panel">
           <div class="panel-title">💼 Active Job Openings</div>
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
-            Browse open positions posted by HR, view salary ranges and requirements, and submit your application.
-          </p>
+          <p style="color:var(--text-500); font-size:0.83rem; margin-bottom:18px;">Browse open positions and submit your
+            application.</p>
           <div id="seekerJobsContainer" class="grid-2">
-            <p style="color: var(--text-muted);">Loading active job postings...</p>
+            <div style="color:var(--text-500);">Loading jobs...</div>
           </div>
         </div>
       </div>
 
-      <!-- Seeker Tab 3: My Applications Tracker -->
+      <!-- My Applications Tab -->
       <div id="seekerAppsTab" class="tab-content">
         <div class="glass-panel">
-          <div class="panel-title">📋 My Submitted Job Applications</div>
+          <div class="panel-title">📋 My Applications</div>
           <div id="seekerAppsContainer">
-            <p style="color: var(--text-muted);">Loading your submitted applications...</p>
+            <div style="color:var(--text-500); text-align:center; padding:30px; font-size:0.87rem;">Loading your
+              applications...</div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </div><!-- /app-container -->
 
-  <!-- HR Proposal Detail Modal -->
+
+  <!-- ══════════════════════════════════════════════
+     CANDIDATE ANALYSIS MODAL
+══════════════════════════════════════════════ -->
   <div id="hrModal" class="modal-overlay">
     <div class="modal-body">
       <button class="modal-close" onclick="closeModal()">✕</button>
-      <h2 id="modalCandidateName" style="color: #fff; font-size: 1.4rem;">Candidate Evaluation</h2>
-      <p id="modalJobTitle" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px;"></p>
-      
+
+      <div style="margin-bottom:6px;">
+        <h2 id="modalCandidateName" style="color:#fff; font-size:1.25rem; font-weight:800;"></h2>
+        <p id="modalJobTitle" style="color:var(--text-500); font-size:0.83rem; margin-top:3px;"></p>
+      </div>
+
       <div id="modalRecBanner" class="rec-banner highly-recommended">
-        <span id="modalRecText">Highly Recommended for Interview</span>
+        <span id="modalRecText">Highly Recommended</span>
       </div>
 
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
-        <span id="modalQualBadge" class="badge-qual success">✓ Qualification Met</span>
-        <span id="modalSkillScoreBadge" class="badge-qual success">Weighted Skill Score: 85%</span>
-        <span id="modalAvailBadge" class="badge-qual success">Availability Met</span>
-        <span id="modalNatBadge" class="badge-qual success">Nationality Met</span>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;">
+        <span id="modalQualBadge" class="badge-qual success">✓ Experience Met</span>
+        <span id="modalSkillScoreBadge" class="badge-qual success">Skills: 85%</span>
+        <span id="modalRuleScoreBadge" class="badge-qual success">Rule Score: 0%</span>
+        <span id="modalLlmScoreBadge" class="badge-qual success">LLM Score: 0%</span>
+        <span id="modalAvailBadge" class="badge-qual success">Availability ✓</span>
+        <span id="modalNatBadge" class="badge-qual success">Nationality ✓</span>
       </div>
 
-      <div style="margin: 20px 0;">
-        <h4 style="color: #fff; margin-bottom: 8px;">AI HR Recommendation Rationale & Selection Reason:</h4>
-        <p id="modalRationale" style="color: var(--text-sub); background: rgba(15, 23, 42, 0.7); padding: 14px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.95rem;"></p>
+      <div style="margin-bottom:18px;">
+        <div
+          style="font-size:0.78rem; font-weight:700; color:var(--text-500); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">
+          AI Recommendation Rationale</div>
+        <p id="modalRationale"
+          style="color:var(--text-300); background:rgba(8,14,30,0.7); padding:14px; border-radius:10px; border:1px solid var(--border); font-size:0.88rem; line-height:1.6;">
+        </p>
       </div>
 
-      <!-- Skill Score Breakdown Table in Modal -->
-      <div style="margin: 20px 0;">
-        <h4 style="color: #fff; margin-bottom: 8px;">⚖️ Weighted Skill Score Breakdown:</h4>
-        <div id="modalSkillBreakdownContainer" style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+      <div style="margin-bottom:18px;">
+        <div
+          style="font-size:0.78rem; font-weight:700; color:var(--text-500); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">
+          ⚖️ Weighted Skill Breakdown</div>
+        <div style="background:rgba(8,14,30,0.6); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
           <table class="breakdown-table">
             <thead>
               <tr>
-                <th>Skill Name</th>
-                <th>HR Weight</th>
-                <th>Matched?</th>
+                <th>Skill</th>
+                <th>Weight</th>
+                <th>Status</th>
                 <th>Score</th>
               </tr>
             </thead>
-            <tbody id="modalSkillBreakdownBody">
-            </tbody>
+            <tbody id="modalSkillBreakdownBody"></tbody>
           </table>
         </div>
       </div>
 
-      <div class="grid-2" style="margin: 20px 0;">
-        <div style="background: rgba(16, 185, 129, 0.08); padding: 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
-          <h4 style="color: #6ee7b7; margin-bottom: 6px;">💪 Key Strengths:</h4>
-          <ul id="modalStrengths" style="color: var(--text-sub); padding-left: 18px; font-size: 0.9rem;"></ul>
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div
+          style="background:rgba(16,185,129,0.06); padding:14px; border-radius:10px; border:1px solid rgba(16,185,129,0.15);">
+          <div
+            style="font-size:0.78rem; font-weight:700; color:#6ee7b7; margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;">
+            💪 Strengths</div>
+          <ul id="modalStrengths" style="color:var(--text-300); padding-left:16px; font-size:0.84rem; line-height:1.8;">
+          </ul>
         </div>
-        <div style="background: rgba(244, 63, 94, 0.08); padding: 14px; border-radius: 8px; border: 1px solid rgba(244, 63, 94, 0.2);">
-          <h4 style="color: #fca5a5; margin-bottom: 6px;">⚠️ Gaps & Areas to Verify:</h4>
-          <ul id="modalGaps" style="color: var(--text-sub); padding-left: 18px; font-size: 0.9rem;"></ul>
+        <div
+          style="background:rgba(244,63,94,0.06); padding:14px; border-radius:10px; border:1px solid rgba(244,63,94,0.15);">
+          <div
+            style="font-size:0.78rem; font-weight:700; color:#fca5a5; margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;">
+            ⚠️ Gaps</div>
+          <ul id="modalGaps" style="color:var(--text-300); padding-left:16px; font-size:0.84rem; line-height:1.8;"></ul>
         </div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
-        <button id="modalShortlistBtn" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-          ⭐ Proceed to Final Selection (Shortlist for Interview)
+      <div
+        style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding-top:16px; border-top:1px solid var(--border);">
+        <button id="modalShortlistBtn" class="btn-primary" style="background:var(--grad-amber);">
+          ⭐ Shortlist for Interview
         </button>
-        <button class="btn-secondary" onclick="closeModal()">Close Evaluation</button>
-      </div>
-    </div>
-  <!-- Google AI API Key Configuration Modal -->
-  <div id="apiKeyModal" class="modal-overlay">
-    <div class="modal-body" style="max-width: 500px;">
-      <button class="modal-close" onclick="closeApiKeyModal()">✕</button>
-      <h3 style="color: #fff; margin-bottom: 8px;">🔑 Configure Google AI (Gemini) API Key</h3>
-      <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 16px;">
-        As a Google AI Pro user, paste your Gemini API key below to enable LLM resume parsing, job criteria extraction, and candidate recommendations.
-      </p>
-
-      <div class="form-group">
-        <label>Gemini / Google AI API Key:</label>
-        <input type="password" id="userApiKeyInput" class="form-control" placeholder="AIzaSy...">
-      </div>
-
-      <div style="font-size: 0.85rem; color: var(--text-sub); margin: 12px 0;">
-        Current Status: <span id="apiKeyModalStatus" style="font-weight: 700; color: var(--accent-cyan);">Checking...</span>
-      </div>
-
-      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-        <button class="btn-primary" onclick="saveApiKey()">Save & Apply API Key</button>
-        <button class="btn-secondary" onclick="closeApiKeyModal()">Cancel</button>
+        <button class="btn-secondary" onclick="closeModal()">Close</button>
       </div>
     </div>
   </div>
 
   <script src="/static/app.js"></script>
 </body>
+
 </html>
-
-
-

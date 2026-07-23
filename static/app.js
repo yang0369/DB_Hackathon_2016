@@ -3,83 +3,20 @@ let selectedJob = null;
 let currentMatchResults = [];
 let currentJobMode = "form";
 let currentRole = "hr";
+let currentRankingMode = "pool"; // "pool" = all candidates, "applicants" = applied only
 let activeCandidate = null; // Stored candidate profile for active job seeker
 let userApplications = [];
 
 document.addEventListener("DOMContentLoaded", () => {
-  checkApiKeyStatus();
   fetchSampleJobs();
   loadCandidatesList();
   setupDragAndDrop();
   loadSeekerJobs();
 });
 
-async function checkApiKeyStatus() {
-  const btn = document.getElementById("apiKeyBtn");
-  const modalStatus = document.getElementById("apiKeyModalStatus");
-
-  try {
-    const res = await fetch("/api/api-key-status");
-    const data = await res.json();
-
-    if (data.has_api_key) {
-      btn.innerHTML = `🟢 Google AI: Active (${data.masked_key})`;
-      btn.style.borderColor = "rgba(16, 185, 129, 0.5)";
-      btn.style.color = "#6ee7b7";
-      if (modalStatus) modalStatus.innerHTML = `🟢 Active (${data.masked_key})`;
-    } else {
-      btn.innerHTML = `🔑 Configure Google AI API Key`;
-      btn.style.borderColor = "rgba(245, 158, 11, 0.5)";
-      btn.style.color = "#fde68a";
-      if (modalStatus) modalStatus.innerHTML = `⚠️ Not Configured (Using Rule-based Parser)`;
-    }
-  } catch (e) {
-    if (btn) btn.innerHTML = `🔑 Google AI API Key`;
-  }
-}
-
-function openApiKeyModal() {
-  checkApiKeyStatus();
-  document.getElementById("apiKeyModal").classList.add("active");
-}
-
-function closeApiKeyModal() {
-  document.getElementById("apiKeyModal").classList.remove("active");
-}
-
-async function saveApiKey() {
-  const keyInput = document.getElementById("userApiKeyInput");
-  const key = keyInput.value.trim();
-  const modalStatus = document.getElementById("apiKeyModalStatus");
-
-  if (!key) {
-    alert("Please enter a valid Google AI Gemini API Key.");
-    return;
-  }
-
-  modalStatus.innerText = "⏳ Applying API Key...";
-
-  try {
-    const res = await fetch("/api/set-api-key", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: key })
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || "Failed to set API Key");
-    }
-
-    alert("✅ Google AI Gemini API Key successfully applied!");
-    keyInput.value = "";
-    closeApiKeyModal();
-    checkApiKeyStatus();
-  } catch (err) {
-    modalStatus.innerText = `❌ Error: ${err.message}`;
-    alert(`❌ Failed to save API Key: ${err.message}`);
-  }
-}
+function openApiKeyModal() {}
+function closeApiKeyModal() {}
+async function saveApiKey() {}
 
 
 function switchPortalRole(role) {
@@ -256,43 +193,47 @@ async function uploadFile(file) {
 
 function renderParsedPreview(profile) {
   const container = document.getElementById("parsedProfileContainer");
-  
+
   const skillsHtml = profile.skills && profile.skills.length > 0
     ? profile.skills.map(s => `<span class="skill-pill">${s}</span>`).join("")
-    : "<span style='color:var(--text-muted)'>No explicit skills extracted</span>";
+    : `<span style='color:var(--text-500); font-size:0.82rem;'>No skills extracted</span>`;
 
   const expHtml = profile.experience && profile.experience.length > 0
     ? profile.experience.map(e => `
-        <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.1);">
-          <strong style="color:#fff;">${e.title || 'Role'}</strong> at <span style="color:#a5b4fc;">${e.company || 'Company'}</span> (${e.duration || 'N/A'})
-          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">${e.description || ''}</p>
+        <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+          <div style="font-weight:700; color:#fff; font-size:0.87rem;">${e.title || 'Role'} <span style="color:var(--cyan); font-weight:500;">@ ${e.company || 'Company'}</span></div>
+          <div style="font-size:0.77rem; color:var(--text-500); margin:2px 0;">${e.duration || 'N/A'}</div>
+          <p style="font-size:0.82rem; color:var(--text-300); margin-top:3px; line-height:1.5;">${e.description || ''}</p>
         </div>
       `).join("")
-    : "<p style='font-size:0.85rem;'>None listed</p>";
+    : `<p style='font-size:0.82rem; color:var(--text-500);'>None listed</p>`;
 
   container.innerHTML = `
-    <div style="text-align: left;">
-      <h3 style="color:#fff; font-size:1.3rem; margin-bottom:4px;">${profile.full_name}</h3>
-      <p style="color:var(--accent-cyan); font-size:0.9rem; margin-bottom:12px;">
-        📧 ${profile.email || 'N/A'} | 📞 ${profile.phone || 'N/A'} | ⏳ ${profile.years_of_experience || 0} Yrs Exp | ⚡ ${profile.availability || 'Immediate'}
-      </p>
-      <div style="margin-bottom: 8px; font-size:0.85rem; color:var(--accent-emerald);">
-        🛂 Nationality / Work Authorization: <strong>${profile.nationality || 'Any / Citizen'}</strong>
-      </div>
-      
-      <div style="margin-bottom: 16px;">
-        <strong style="color:#fff; font-size:0.9rem;">Summary:</strong>
-        <p style="font-size:0.88rem; color:var(--text-sub); margin-top:4px;">${profile.summary || 'N/A'}</p>
+    <div style="text-align:left;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">👤</div>
+        <div>
+          <h3 style="color:#fff; font-size:1.1rem; font-weight:800; margin-bottom:2px;">${profile.full_name}</h3>
+          <div style="font-size:0.78rem; color:var(--text-500);">${profile.email || ''} ${profile.phone ? '· ' + profile.phone : ''}</div>
+        </div>
       </div>
 
-      <div style="margin-bottom: 16px;">
-        <strong style="color:#fff; font-size:0.9rem;">Key Extracted Skills:</strong>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <span style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); color:#67e8f9; padding:3px 10px; border-radius:10px; font-size:0.77rem; font-weight:600;">⏳ ${profile.years_of_experience || 0} Yrs</span>
+        <span style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); color:#6ee7b7; padding:3px 10px; border-radius:10px; font-size:0.77rem; font-weight:600;">⚡ ${profile.availability || 'Immediate'}</span>
+        <span style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); color:#a5b4fc; padding:3px 10px; border-radius:10px; font-size:0.77rem; font-weight:600;">🛂 ${profile.nationality || 'Any'}</span>
+      </div>
+
+      ${profile.summary ? `<p style="font-size:0.83rem; color:var(--text-300); margin-bottom:14px; line-height:1.5; padding:10px; background:rgba(8,14,30,0.5); border-radius:8px; border:1px solid var(--border);">${profile.summary}</p>` : ''}
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-500); text-transform:uppercase; letter-spacing:.5px; margin-bottom:7px;">Key Skills</div>
         <div class="skills-list">${skillsHtml}</div>
       </div>
 
       <div>
-        <strong style="color:#fff; font-size:0.9rem;">Work Experience:</strong>
-        <div style="margin-top:8px;">${expHtml}</div>
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-500); text-transform:uppercase; letter-spacing:.5px; margin-bottom:7px;">Work Experience</div>
+        ${expHtml}
       </div>
     </div>
   `;
@@ -468,7 +409,7 @@ async function autoExtractJobDetailsWithLLM() {
 
   const rawText = `Position Title: ${title}\nDepartment: ${dept}\n\n${desc}`;
 
-  if (statusSpan) statusSpan.innerText = "⏳ Google AI extracting key skills, qualifications, experience, and scoring candidates...";
+  if (statusSpan) statusSpan.innerText = "⏳ Google AI extracting key skills, qualifications & experience criteria...";
 
   try {
     const res = await fetch("/api/jobs/parse", {
@@ -486,6 +427,9 @@ async function autoExtractJobDetailsWithLLM() {
     parsedJob.salary_min = salMin;
     parsedJob.salary_max = salMax;
 
+    // Show extracted criteria preview immediately
+    renderExtractedCriteria(parsedJob);
+
     // Save job into database
     const saveRes = await fetch("/api/jobs", {
       method: "POST",
@@ -496,15 +440,15 @@ async function autoExtractJobDetailsWithLLM() {
     selectedJob = await saveRes.json();
     await fetchSampleJobs();
 
-    if (statusSpan) statusSpan.innerText = `✅ Extracted ${selectedJob.required_skills.length} skills & scoring candidates!`;
+    if (statusSpan) statusSpan.innerText = `✅ Extracted ${selectedJob.required_skills.length} key skills — see criteria preview below!`;
 
-    alert(`✅ Google AI LLM successfully extracted job criteria for "${selectedJob.title}"!\n• Extracted Key Skills: ${selectedJob.required_skills.join(', ')}\n• Required Experience: ${selectedJob.min_years_experience} Yrs\n• Qualification Level: ${selectedJob.education_level}\n\nNavigating to HR Analytics & Leaderboard to score candidate resumes!`);
-
-    currentMatchResults = [];
-    switchHrTab('hrApplicantsTab', document.querySelectorAll("#hrPortalView .nav-btn")[1]);
-    document.getElementById("jobSelect").value = selectedJob.id;
-    loadSelectedJobApplicants();
-
+    // Wait 2s so HR can read the preview, then navigate to ranking
+    setTimeout(() => {
+      currentMatchResults = [];
+      switchHrTab('hrApplicantsTab', document.querySelectorAll("#hrPortalView .nav-btn")[1]);
+      document.getElementById("jobSelect").value = selectedJob.id;
+      loadSelectedJobApplicants();
+    }, 2500);
 
   } catch (err) {
     if (statusSpan) statusSpan.innerText = `❌ Error: ${err.message}`;
@@ -512,6 +456,126 @@ async function autoExtractJobDetailsWithLLM() {
   }
 }
 
+function renderExtractedCriteria(job) {
+  const panel = document.getElementById("extractedCriteriaPanel");
+  const content = document.getElementById("extractedCriteriaContent");
+  if (!panel || !content) return;
+
+  const kr = job.jd_key_requirements || {};
+  const skills = kr.key_skills || job.required_skills || [];
+  const prefSkills = kr.preferred_skills || job.preferred_skills || [];
+  const experience = kr.key_experience || [];
+  const qualifications = kr.key_qualifications || [];
+  const academic = kr.academic_qualifications || job.academic_qualifications || [];
+  const certs = kr.required_certifications || job.required_certifications || [];
+  const education = kr.education_level || job.education_level || 'Not specified';
+  const minYears = kr.min_years_experience || job.min_years_experience || 0;
+  const weights = kr.skill_weights || job.skill_weights || {};
+  const hard = kr.hard_criteria || job.hard_criteria || {};
+  const mandatoryNat = hard.mandatory_nationality || job.required_nationality || 'Any';
+
+  const pillStyle = (color) => `background:rgba(${color},0.12); border:1px solid rgba(${color},0.28); padding:3px 10px; border-radius:20px; font-size:0.78rem; font-weight:600;`;
+
+  content.innerHTML = `
+    <div class="grid-2" style="gap:14px;">
+      <!-- Hard Criteria / Knockout Rules -->
+      <div style="background:rgba(244,63,94,0.06); border:1px solid rgba(244,63,94,0.25); border-radius:12px; padding:14px; grid-column: 1 / -1;">
+        <div style="font-weight:700; color:#fca5a5; font-size:0.85rem; margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; gap:6px;">
+          🚫 Hard Non-Negotiable Criteria (Knockout Rules)
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <span style="${pillStyle('244,63,94')} color:#fca5a5;">
+            🛂 Mandatory Nationality / Work Status: <strong>${mandatoryNat}</strong>
+          </span>
+          <span style="${pillStyle('244,63,94')} color:#fde68a;">
+            ⏳ Mandatory Min Experience: <strong>${minYears} Years</strong>
+          </span>
+          <span style="${pillStyle('244,63,94')} color:#a5f3fc;">
+            🎓 Required Degree Level: <strong>${education}</strong>
+          </span>
+          ${certs.length > 0 ? `<span style="${pillStyle('244,63,94')} color:#a5b4fc;">📜 Mandatory Certs: <strong>${certs.join(', ')}</strong></span>` : ''}
+        </div>
+      </div>
+
+      <!-- Must-Have Skills -->
+      <div style="background:rgba(99,102,241,0.06); border:1px solid rgba(99,102,241,0.18); border-radius:12px; padding:14px;">
+        <div style="font-weight:700; color:#a5b4fc; font-size:0.82rem; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px;">🎯 Key Required Skills (${skills.length})</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px;">
+          ${skills.map(s => `<span style="${pillStyle('99,102,241')} color:#c7d2fe;">${s}${weights[s] ? ` <span style="opacity:0.6;">${Math.round(weights[s])}%</span>` : ''}</span>`).join('')}
+          ${skills.length === 0 ? '<span style="color:var(--text-500); font-size:0.82rem;">None extracted</span>' : ''}
+        </div>
+      </div>
+
+      <!-- Preferred Skills -->
+      <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.15); border-radius:12px; padding:14px;">
+        <div style="font-weight:700; color:#6ee7b7; font-size:0.82rem; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px;">⭐ Preferred Skills (${prefSkills.length})</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px;">
+          ${prefSkills.map(s => `<span style="${pillStyle('16,185,129')} color:#a7f3d0;">${s}</span>`).join('')}
+          ${prefSkills.length === 0 ? '<span style="color:var(--text-500); font-size:0.82rem;">None specified</span>' : ''}
+        </div>
+      </div>
+
+      <!-- Experience & Role Requirements -->
+      <div style="background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.15); border-radius:12px; padding:14px;">
+        <div style="font-weight:700; color:#fbbf24; font-size:0.82rem; margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;">💼 Key Role Experience</div>
+        <ul style="margin:0; padding-left:15px; color:var(--text-300); font-size:0.82rem; line-height:1.7;">
+          ${experience.map(e => `<li>${e}</li>`).join('')}
+          ${experience.length === 0 ? '<li style="color:var(--text-500);">General professional experience</li>' : ''}
+        </ul>
+      </div>
+
+      <!-- Academic Qualifications & Education -->
+      <div style="background:rgba(6,182,212,0.05); border:1px solid rgba(6,182,212,0.15); border-radius:12px; padding:14px;">
+        <div style="font-weight:700; color:#67e8f9; font-size:0.82rem; margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;">🎓 Academic Qualifications</div>
+        <span style="${pillStyle('6,182,212')} color:#a5f3fc; display:inline-block; margin-bottom:8px;">🎓 Degree: ${education}</span>
+        <ul style="margin:0; padding-left:15px; color:var(--text-300); font-size:0.82rem; line-height:1.7;">
+          ${academic.map(a => `<li>${a}</li>`).join('')}
+          ${qualifications.map(q => `<li>${q}</li>`).join('')}
+          ${academic.length === 0 && qualifications.length === 0 ? '<li style="color:var(--text-500);">Bachelor in CS / STEM / IT or equivalent preferred</li>' : ''}
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:14px; padding:11px 14px; background:rgba(8,14,30,0.6); border-radius:10px; border:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span style="font-size:0.82rem; color:var(--text-500);">Auto-ranking in <span id="criteriaCountdown" style="color:var(--cyan); font-weight:700;">2</span>s</span>
+      <button onclick="navigateToRankingNow()" class="btn-primary" style="font-size:0.78rem; padding:5px 12px;">⚡ Rank Now</button>
+      <span style="font-size:0.8rem; color:var(--text-500);">Job: <strong style="color:#fff;">${job.title}</strong> · <strong style="color:var(--cyan);">${skills.length} skills</strong> · Knockout: <strong style="color:#fca5a5;">${mandatoryNat}</strong></span>
+    </div>
+  `;
+
+  let count = 2;
+  const interval = setInterval(() => {
+    count--;
+    const el = document.getElementById("criteriaCountdown");
+    if (el) el.innerText = count;
+    if (count <= 0) clearInterval(interval);
+  }, 1000);
+
+  panel.style.display = "block";
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function navigateToRankingNow() {
+  if (!selectedJob) return;
+  currentMatchResults = [];
+  switchHrTab('hrApplicantsTab', document.querySelectorAll("#hrPortalView .nav-btn")[1]);
+  document.getElementById("jobSelect").value = selectedJob.id;
+  loadSelectedJobApplicants();
+}
+
+function setRankingMode(mode) {
+  currentRankingMode = mode;
+  const poolBtn = document.getElementById("rankModePoolBtn");
+  const appsBtn = document.getElementById("rankModeApplicantsBtn");
+  const modeLabel = document.getElementById("rankingModeLabel");
+
+  if (poolBtn) poolBtn.className = mode === 'pool' ? 'btn-primary' : 'btn-secondary';
+  if (appsBtn) appsBtn.className = mode === 'applicants' ? 'btn-primary' : 'btn-secondary';
+  if (modeLabel) modeLabel.innerText = mode === 'pool' ? 'Showing: All Pool Candidates' : 'Showing: Applicants Only';
+
+  // Reload current job with new mode
+  if (selectedJob) loadSelectedJobApplicants();
+}
 
 
 async function loadSelectedJobApplicants() {
@@ -543,29 +607,37 @@ async function loadSelectedJobApplicants() {
   const salMax = selectedJob.salary_max ? `$${selectedJob.salary_max.toLocaleString()}` : '';
   document.getElementById("jdSalaryBadge").innerText = (salMin && salMax) ? `💵 Salary: ${salMin} - ${salMax} / yr` : '💵 Competitive Salary';
 
-  container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">⚡ Google AI model & weighted skill engine ranking applicants...</p>`;
+  const modeLabel = currentRankingMode === 'pool' ? 'all pool candidates' : 'applicants only';
+  container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">⚡ Ranking ${modeLabel} against job requirements...</p>`;
 
   try {
-    const res = await fetch(`/api/jobs/${selectedJob.id}/ranked-applicants`);
-    if (!res.ok) throw new Error("Failed to fetch ranked applicants");
+    let fetchedResults = [];
 
-    currentMatchResults = await res.json();
-    
-    if (!currentMatchResults || currentMatchResults.length === 0) {
+    if (currentRankingMode === 'pool') {
+      // Rank ALL candidates in the pool
+      const res = await fetch(`/api/jobs/${selectedJob.id}/rank-all-candidates`);
+      if (res.ok) fetchedResults = await res.json();
+    } else {
+      // Applicants only
+      const res = await fetch(`/api/jobs/${selectedJob.id}/ranked-applicants`);
+      if (res.ok) fetchedResults = await res.json();
+    }
+
+    // Fallback: if no results from either, use /api/match
+    if (!fetchedResults || fetchedResults.length === 0) {
       const fallbackRes = await fetch("/api/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(selectedJob)
       });
-      if (fallbackRes.ok) {
-        currentMatchResults = await fallbackRes.json();
-      }
+      if (fallbackRes.ok) fetchedResults = await fallbackRes.json();
     }
 
+    currentMatchResults = fetchedResults;
     renderAnalyticsDashboard(currentMatchResults);
     renderLeaderboard(currentMatchResults);
   } catch (err) {
-    container.innerHTML = `<p style="color: #fca5a5; text-align: center;">❌ Error evaluating applicants: ${err.message}</p>`;
+    container.innerHTML = `<p style="color: #fca5a5; text-align: center;">❌ Error evaluating candidates: ${err.message}</p>`;
   }
 }
 
@@ -586,13 +658,11 @@ function renderAnalyticsDashboard(matches) {
   const totalApps = matches.length;
   const targetX = selectedJob.target_candidate_count || 3;
   const shortlisted = matches.filter(m => m.selection_status === "Shortlisted for Interview" || m.selection_status === "Selected").length;
-  
   const topMatches = matches.slice(0, targetX);
   const avgTopScore = topMatches.length > 0
     ? Math.round(topMatches.reduce((acc, m) => acc + m.match_score, 0) / topMatches.length)
     : 0;
-
-  const avgSkillIndex = Math.round(matches.reduce((acc, m) => acc + (m.weighted_skill_score || m.skill_coverage), 0) / totalApps);
+  const avgSkillIndex = Math.round(matches.reduce((acc, m) => acc + (m.weighted_skill_score || m.skill_coverage || 0), 0) / totalApps);
 
   document.getElementById("kpiTotalApps").innerText = totalApps;
   document.getElementById("kpiTargetCount").innerText = targetX;
@@ -600,98 +670,133 @@ function renderAnalyticsDashboard(matches) {
   document.getElementById("kpiAvgTopScore").innerText = `${avgTopScore}%`;
   document.getElementById("kpiSkillIndex").innerText = `${avgSkillIndex}%`;
 
-  // Render Skill Score Comparison Bar Chart for Top Candidates
-  const reqSkills = selectedJob.required_skills || [];
   chartContainer.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:12px;">
-      ${topMatches.map(m => `
-        <div style="background: rgba(15,23,42,0.6); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <strong style="color:#fff; font-size:0.95rem;">Rank #${m.rank_position}: ${m.candidate_name}</strong>
-            <span style="color:var(--accent-emerald); font-weight:700; font-size:0.9rem;">Overall Fit: ${m.match_score}% | Weighted Skill: ${m.weighted_skill_score}%</span>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${topMatches.map((m, i) => {
+        const score = Math.round(m.match_score);
+        const skillScore = Math.round(m.weighted_skill_score || m.skill_coverage || 0);
+        const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f43f5e';
+        return `
+          <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(8,14,30,0.5); border-radius:10px; border:1px solid var(--border);">
+            <span style="font-size:0.72rem; font-weight:800; color:var(--text-500); width:18px; text-align:center;">#${i+1}</span>
+            <span style="font-weight:700; color:#fff; font-size:0.87rem; min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.candidate_name}</span>
+            <div style="flex:1; display:flex; align-items:center; gap:8px;">
+              <div style="flex:1; height:6px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden;">
+                <div style="height:100%; width:${score}%; background:${color}; border-radius:3px; transition:width 0.6s ease;"></div>
+              </div>
+              <span style="font-size:0.85rem; font-weight:800; color:${color}; min-width:38px; text-align:right;">${score}%</span>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              ${(m.matched_skills || []).slice(0,3).map(s => `<span style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); color:#6ee7b7; padding:1px 7px; border-radius:10px; font-size:0.72rem;">${s}</span>`).join('')}
+            </div>
           </div>
-          <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width: ${m.match_score}%;"></div>
-          </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
-            ${(m.skill_scores_breakdown || []).map(sb => `
-              <span style="font-size:0.78rem; padding:2px 8px; border-radius:10px; background:${sb.matched ? 'rgba(16,185,129,0.15)' : 'rgba(244,63,94,0.15)'}; color:${sb.matched ? '#6ee7b7' : '#fca5a5'}; border:1px solid ${sb.matched ? 'rgba(16,185,129,0.3)' : 'rgba(244,63,94,0.3)'}">
-                ${sb.skill} (w:${sb.weight}%): ${sb.matched ? '100%' : '0%'}
-              </span>
-            `).join("")}
-          </div>
-        </div>
-      `).join("")}
+        `;
+      }).join('')}
     </div>
   `;
 }
 
+
 function renderLeaderboard(matches) {
   const container = document.getElementById("leaderboardContainer");
   if (!matches || matches.length === 0) {
-    container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 30px;">No applicants found for this job position yet.</p>`;
+    container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-500);">No candidates found for this job. Upload resumes to the Candidate Pool first.</div>`;
     return;
   }
 
-  container.innerHTML = matches.map((m, index) => {
-    let scoreClass = "score-low";
-    if (m.match_score >= 75) scoreClass = "score-high";
-    else if (m.match_score >= 50) scoreClass = "score-medium";
+  const targetX = selectedJob ? (selectedJob.target_candidate_count || 3) : 3;
 
-    const matchedPills = (m.matched_skills || []).map(s => `<span class="skill-pill matched">✓ ${s}</span>`).join("");
-    const prefPills = (m.preferred_matched_skills || []).map(s => `<span class="skill-pill preferred">★ ${s}</span>`).join("");
-    const missingPills = (m.missing_skills || []).map(s => `<span class="skill-pill missing">✗ ${s}</span>`).join("");
+  container.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Candidate</th>
+            <th style="text-align:center;">Overall</th>
+            <th style="text-align:center;">Skills</th>
+            <th style="text-align:center;">Experience</th>
+            <th style="text-align:center;">Availability</th>
+            <th style="text-align:center;">Recommendation</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${matches.map((m, index) => {
+            const isDisqualified = m.hard_criteria_passed === false;
+            const isTop = m.is_top_candidate && !isDisqualified;
+            const overall = Math.round(m.match_score);
+            const skillPct = Math.round(m.weighted_skill_score || m.skill_coverage || 0);
+            const expPct = Math.round(m.qualification_score || 0);
+            const color = (v, hi=75, mid=50) => isDisqualified ? '#f43f5e' : v >= hi ? '#10b981' : v >= mid ? '#f59e0b' : '#f43f5e';
 
-    const expBadgeClass = m.experience_met ? "success" : "warning";
-    const expIcon = m.experience_met ? "✓" : "⚠️";
+            let recIcon = '⚠'; let recStyle = 'color:#fca5a5; background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.2);';
+            if (isDisqualified) {
+              recIcon = '🚫'; recStyle = 'color:#fca5a5; background:rgba(244,63,94,0.2); border:1px solid rgba(244,63,94,0.4); font-weight:800;';
+            } else if (m.hr_recommendation && m.hr_recommendation.toLowerCase().includes('highly')) {
+              recIcon = '⭐'; recStyle = 'color:#6ee7b7; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2);';
+            } else if (m.hr_recommendation && m.hr_recommendation.toLowerCase().includes('consider')) {
+              recIcon = '👍'; recStyle = 'color:#fde68a; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2);';
+            }
 
-    const isTopChoice = m.is_top_candidate;
-    const topBadge = isTopChoice
-      ? `<span class="top-candidate-badge">⭐ TOP ${m.rank_position} OF ${selectedJob.target_candidate_count || 3} INTERVIEW SHORTLIST</span>`
-      : '';
+            const recLabel = isDisqualified ? 'Disqualified' : (m.hr_recommendation || 'Review')
+              .replace('Highly Recommended', 'Highly Rec.')
+              .replace('Consider for Interview', 'Consider')
+              .replace('Skip / Low Match', 'Low Match');
 
-    let statusClass = "applied";
-    if (m.selection_status === "Shortlisted for Interview") statusClass = "shortlisted";
-    else if (m.selection_status === "Selected") statusClass = "selected";
-    else if (m.selection_status === "Rejected") statusClass = "rejected";
-
-    return `
-      <div class="candidate-card ${isTopChoice ? 'top-choice' : ''}">
-        <div style="display:flex; align-items:center; gap: 16px; flex: 1;">
-          <div style="font-size:1.2rem; font-weight:800; color:var(--text-muted); width:28px;">#${index + 1}</div>
-          <div class="candidate-info" style="flex:1;">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-              <h3>${m.candidate_name}</h3>
-              ${topBadge}
-              <span class="status-badge ${statusClass}">${m.selection_status || 'Applied'}</span>
-              <span class="badge-qual ${expBadgeClass}">${expIcon} ${m.experience_summary || 'Experience'}</span>
-            </div>
-            <div class="candidate-sub" style="margin-top:4px;">
-              Weighted Skill Score: <strong style="color:#6ee7b7;">${m.weighted_skill_score || m.skill_coverage}%</strong> | Avail: <strong>${m.candidate_availability || 'Immediate'}</strong> | Status: <strong>${m.candidate_nationality || 'Any'}</strong>
-            </div>
-            <div class="skills-list" style="margin-top:6px;">
-              ${matchedPills} ${prefPills} ${missingPills}
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex; align-items:center; gap: 14px;">
-          <div class="score-badge ${scoreClass}">
-            ${Math.round(m.match_score)}%
-            <span class="score-label">MATCH</span>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <button class="btn-primary" onclick="openHRProposalModal('${m.candidate_id}')" style="font-size:0.82rem; padding:6px 14px;">
-              🔍 Analysis Rationale
-            </button>
-            <button class="btn-secondary" onclick="shortlistCandidate('${m.candidate_id}')" style="font-size:0.8rem; padding:4px 10px; background:rgba(245,158,11,0.15); color:#fde68a; border-color:rgba(245,158,11,0.3);">
-              ⭐ Shortlist Candidate
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join("");
+            return `
+              <tr class="${isTop ? 'top-row' : ''}" style="${isDisqualified ? 'opacity: 0.7;' : ''}">
+                <td style="text-align:center; font-weight:800; font-size:0.95rem; color:${isTop ? '#f59e0b' : 'var(--text-500)'};">${
+                  isDisqualified ? '🚫' : isTop ? '⭐' : (index+1)
+                }</td>
+                <td>
+                  <div style="font-weight:700; color:#fff; font-size:0.88rem; display:flex; align-items:center; gap:6px;">
+                    ${m.candidate_name}
+                    ${isTop ? `<span class="top-candidate-badge">TOP ${index+1}</span>` : ''}
+                    ${isDisqualified ? `<span style="background:rgba(244,63,94,0.2); color:#fca5a5; font-size:0.7rem; font-weight:800; padding:2px 6px; border-radius:6px;">KNOCKOUT</span>` : ''}
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--text-500); margin-top:2px;">
+                    ${isDisqualified && m.disqualification_reasons && m.disqualification_reasons.length > 0
+                      ? `<span style="color:#fca5a5;">🚫 ${m.disqualification_reasons[0]}</span>`
+                      : m.matched_skills && m.matched_skills.length > 0
+                        ? `✓ ${m.matched_skills.slice(0,3).join(', ')}${m.matched_skills.length > 3 ? ` +${m.matched_skills.length-3}` : ''}`
+                        : 'No match'}
+                  </div>
+                  ${!isDisqualified && m.missing_skills && m.missing_skills.length > 0 ? `<div style="font-size:0.72rem; color:#fca5a5; margin-top:1px;">✗ ${m.missing_skills.slice(0,2).join(', ')}</div>` : ''}
+                </td>
+                <td style="text-align:center;">
+                  <div style="font-size:1.1rem; font-weight:800; color:${color(overall)};">${isDisqualified ? '0%' : overall + '%'}</div>
+                  <div class="mini-bar-wrap" style="margin:4px auto 0;"><div class="mini-bar-fill" style="width:${isDisqualified ? 0 : overall}%; background:${color(overall)};"></div></div>
+                </td>
+                <td style="text-align:center;">
+                  <div style="font-size:0.95rem; font-weight:700; color:${color(skillPct,70,40)};">${skillPct}%</div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">weighted</div>
+                </td>
+                <td style="text-align:center;">
+                  <div style="font-size:0.95rem; font-weight:700; color:${color(expPct)};">${expPct}%</div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">${m.experience_met ? '✓ Met' : '⚠ Gap'}</div>
+                </td>
+                <td style="text-align:center; font-size:0.8rem; font-weight:600; color:${m.nationality_score === 0 ? '#f43f5e' : m.availability_score >= 90 ? '#10b981' : '#f59e0b'}">
+                  ${m.nationality_score === 0 ? '🚫 Mismatch' : (m.availability_score >= 90 ? '✓' : '~') + ' ' + (m.candidate_availability || 'Immediate').replace(' Notice', '')}
+                </td>
+                <td style="text-align:center;">
+                  <span style="${recStyle} padding:3px 8px; border-radius:8px; font-size:0.74rem; font-weight:600; white-space:nowrap;">
+                    ${recIcon} ${recLabel}
+                  </span>
+                </td>
+                <td>
+                  <div style="display:flex; gap:5px; align-items:center;">
+                    <button class="btn-primary" onclick="openHRProposalModal('${m.candidate_id}')" style="font-size:0.72rem; padding:5px 10px;">Details</button>
+                    ${!isDisqualified ? `<button onclick="shortlistCandidate('${m.candidate_id}')" style="font-size:0.7rem; padding:4px 8px; border-radius:6px; background:rgba(245,158,11,0.1); color:#fde68a; border:1px solid rgba(245,158,11,0.25); cursor:pointer;">⭐</button>` : ''}
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 async function shortlistCandidate(candidateId) {
@@ -717,14 +822,20 @@ function openHRProposalModal(candidateId) {
   if (!match) return;
 
   document.getElementById("modalCandidateName").innerText = `HR Proposal & Analytics for ${match.candidate_name}`;
-  document.getElementById("modalJobTitle").innerText = `Target Role: ${match.job_title} | Rank #${match.rank_position} | Overall Score: ${match.match_score}%`;
+  document.getElementById("modalJobTitle").innerText = `Target Role: ${match.job_title} | Rank #${match.rank_position} | Overall Hybrid Score: ${match.match_score}%`;
   document.getElementById("modalRationale").innerText = match.summary_rationale;
 
   const banner = document.getElementById("modalRecBanner");
   const recText = document.getElementById("modalRecText");
 
   banner.className = "rec-banner";
-  if (match.is_top_candidate) {
+  if (match.hard_criteria_passed === false) {
+    banner.classList.add("skip");
+    banner.style.background = "rgba(244,63,94,0.2)";
+    banner.style.borderColor = "rgba(244,63,94,0.4)";
+    banner.style.color = "#fca5a5";
+    recText.innerText = `🚫 DISQUALIFIED (HARD CRITERIA KNOCKOUT) - ${match.disqualification_reasons ? match.disqualification_reasons[0] : match.hr_recommendation}`;
+  } else if (match.is_top_candidate) {
     banner.classList.add("highly-recommended");
     recText.innerText = `⭐ TOP ${match.rank_position} CANDIDATE FOR INTERVIEW - ${match.hr_recommendation}`;
   } else if (match.match_score >= 50) {
@@ -747,6 +858,14 @@ function openHRProposalModal(candidateId) {
   const skillBadge = document.getElementById("modalSkillScoreBadge");
   skillBadge.className = match.weighted_skill_score >= 60 ? "badge-qual success" : "badge-qual warning";
   skillBadge.innerText = `Weighted Skill Score: ${match.weighted_skill_score || match.skill_coverage}%`;
+
+  const ruleScoreBadge = document.getElementById("modalRuleScoreBadge");
+  ruleScoreBadge.className = match.rule_based_score >= 60 ? "badge-qual success" : "badge-qual warning";
+  ruleScoreBadge.innerText = `Rule Score: ${match.rule_based_score || 0}%`;
+
+  const llmScoreBadge = document.getElementById("modalLlmScoreBadge");
+  llmScoreBadge.className = match.llm_match_score >= 60 ? "badge-qual success" : "badge-qual warning";
+  llmScoreBadge.innerText = `LLM Score: ${match.llm_match_score || 0}%`;
 
   const availBadge = document.getElementById("modalAvailBadge");
   availBadge.innerText = `Availability: ${match.candidate_availability || 'Immediate'}`;
@@ -798,25 +917,65 @@ async function loadCandidatesList() {
     }
 
     container.innerHTML = `
-      <div style="margin-bottom: 12px; font-weight:600; color:var(--accent-cyan);">Total Stored Candidates: ${candidates.length}</div>
-      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+      <div style="font-size:0.78rem; color:var(--text-500); font-weight:600; margin-bottom:14px; text-transform:uppercase; letter-spacing:.5px;">
+        ${candidates.length} candidates in pool
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
         ${candidates.map(c => `
-          <div style="background:rgba(15, 23, 42, 0.6); padding:16px; border-radius:10px; border:1px solid var(--border-color);">
-            <h4 style="color:#fff; font-size:1.05rem;">${c.profile.full_name}</h4>
-            <div style="font-size:0.82rem; color:var(--text-muted); margin:4px 0;">${c.file_name} (${c.profile.years_of_experience || 0} Yrs Exp)</div>
-            <div style="font-size:0.85rem; color:var(--text-sub); margin-top:4px;">
-              Avail: <strong>${c.profile.availability || 'Immediate'}</strong> | Status: <strong>${c.profile.nationality || 'Any'}</strong>
+          <div style="background:rgba(14,22,44,0.6); padding:14px; border-radius:12px; border:1px solid var(--border); transition:border-color 0.2s;"
+               onmouseover="this.style.borderColor='rgba(255,255,255,0.14)'"
+               onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+              <div style="width:36px;height:36px;border-radius:10px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">👤</div>
+              <div>
+                <div style="font-weight:700; color:#fff; font-size:0.9rem;">${c.profile.full_name}</div>
+                <div style="font-size:0.72rem; color:var(--text-500); margin-top:1px;">${c.profile.years_of_experience || 0} yrs · ${c.profile.availability || 'Immediate'}</div>
+              </div>
             </div>
-            <div style="font-size:0.85rem; color:var(--text-sub); margin-top:8px;">
-              <strong>Skills:</strong> ${(c.profile.skills || []).slice(0, 6).join(", ")}
+            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;">
+              ${(c.profile.skills || []).slice(0, 5).map(s => `<span style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.22); color:#a5b4fc; padding:2px 7px; border-radius:8px; font-size:0.72rem;">${s}</span>`).join('')}
+              ${(c.profile.skills || []).length > 5 ? `<span style="color:var(--text-500); font-size:0.72rem; padding:2px 4px;">+${(c.profile.skills||[]).length-5}</span>` : ''}
             </div>
-            <button class="btn-secondary" style="margin-top:10px; font-size:0.78rem; padding:4px 10px;" onclick="selectCandidateAsActive('${c.id}')">Use Profile as Job Seeker</button>
+            <button class="btn-secondary" style="width:100%; font-size:0.75rem; padding:5px 10px; justify-content:center;" onclick="selectCandidateAsActive('${c.id}')">
+              Use as Job Seeker Profile
+            </button>
           </div>
         `).join("")}
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<p style="color:#fca5a5;">Failed to load candidate list: ${err.message}</p>`;
+    container.innerHTML = `<p style="color:#fca5a5;">Failed to load candidates: ${err.message}</p>`;
+  }
+}
+
+
+async function syncCandidatePool() {
+  const container = document.getElementById("candidatesListTable");
+  container.innerHTML = `<div style="color:var(--text-500); text-align:center; padding:30px;">⏳ Syncing candidate pool files with vector store...</div>`;
+  try {
+    const res = await fetch("/api/candidates/sync", { method: "POST" });
+    if (!res.ok) throw new Error("Sync failed");
+    await loadCandidatesList();
+    if (selectedJob) loadSelectedJobApplicants();
+  } catch (err) {
+    alert(`Sync failed: ${err.message}`);
+    loadCandidatesList();
+  }
+}
+
+async function clearCandidatePool() {
+  if (!confirm("Are you sure you want to purge all candidate vector embeddings and candidate records?")) return;
+  const container = document.getElementById("candidatesListTable");
+  container.innerHTML = `<div style="color:var(--text-500); text-align:center; padding:30px;">⏳ Purging database...</div>`;
+  try {
+    const res = await fetch("/api/candidates/clear-all", { method: "POST" });
+    if (!res.ok) throw new Error("Clear failed");
+    await loadCandidatesList();
+    currentMatchResults = [];
+    if (selectedJob) loadSelectedJobApplicants();
+  } catch (err) {
+    alert(`Clear failed: ${err.message}`);
+    loadCandidatesList();
   }
 }
 

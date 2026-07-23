@@ -3,6 +3,10 @@ import os
 import pypdf
 import pdfplumber
 import docx
+import logging
+
+# Suppress annoying FontBBox warnings from pdfminer (used by pdfplumber)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     """Extract text from PDF file bytes using pdfplumber with pypdf fallback."""

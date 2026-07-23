@@ -167,3 +167,62 @@ Raw Resume: {candidate_record.raw_text[:2000]}
 
     def list_all_candidates(self) -> List[CandidateRecord]:
         return list(self.candidates_db.values())
+
+    def delete_candidate(self, candidate_id: str):
+        """Remove a candidate record from in-memory database and ChromaDB collection."""
+        if candidate_id in self.candidates_db:
+            del self.candidates_db[candidate_id]
+        if self.collection:
+            try:
+                self.collection.delete(ids=[candidate_id])
+            except Exception as e:
+                print(f"ChromaDB delete candidate error: {e}")
+
+    def reset_all(self):
+        """Purge all vector embeddings and candidate records from ChromaDB and memory."""
+        self.candidates_db.clear()
+        if self.client:
+            try:
+                self.client.delete_collection("resumes")
+                self.collection = self.client.get_or_create_collection(
+                    name="resumes",
+                    metadata={"hnsw:space": "cosine"}
+                )
+                print("ChromaDB vector collection reset successfully.")
+            except Exception as e:
+                print(f"ChromaDB reset error: {e}")
+                if self.collection:
+                    try:
+                        c_data = self.collection.get()
+                        if c_data and 'ids' in c_data and c_data['ids']:
+                            self.collection.delete(ids=c_data['ids'])
+                    except Exception:
+                        pass
+
+    def reconcile_with_files(self, valid_filenames: set):
+        """Purge candidates from memory and ChromaDB vector store whose file is no longer in candidate_pool."""
+        # 1. Remove from in-memory candidates_db
+        to_del_mem = [
+            cid for cid, rec in self.candidates_db.items()
+            if rec.file_name not in valid_filenames
+        ]
+        for cid in to_del_mem:
+            if cid in self.candidates_db:
+                del self.candidates_db[cid]
+
+        # 2. Reconcile ChromaDB vector entries
+        if self.collection:
+            try:
+                c_data = self.collection.get(include=['metadatas'])
+                if c_data and 'ids' in c_data and c_data['ids']:
+                    chroma_del_ids = []
+                    for cid, meta in zip(c_data['ids'], c_data.get('metadatas', [])):
+                        fname = meta.get('file_name') if meta else None
+                        if not fname or fname not in valid_filenames:
+                            chroma_del_ids.append(cid)
+                    if chroma_del_ids:
+                        self.collection.delete(ids=chroma_del_ids)
+                        print(f"ChromaDB vector store purged {len(chroma_del_ids)} stale/deleted candidate embeddings.")
+            except Exception as e:
+                print(f"ChromaDB vector store reconciliation notice: {e}")
+

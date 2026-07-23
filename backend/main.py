@@ -21,6 +21,7 @@ from backend.models import (
     CandidateProfile,
     CandidateRecord,
     JobDescription,
+    JDKeyRequirements,
     MatchAnalysis
 )
 from backend.extractor import extract_text_from_file
@@ -58,28 +59,34 @@ matcher = CandidateMatcher(vector_store)
 
 
 # Upload directory (absolute path for applicant pool storage)
-UPLOAD_DIR = r"C:\Users\User\Desktop\Project\DB_Hackathon_2016\uploads\resumes"
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads", "candidate_pool")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def sync_uploads_directory(store: VectorStore):
-    """Scan C:\\Users\\User\\Desktop\\Project\\DB_Hackathon_2016\\uploads\\resumes and index any new resume files into candidate applicant pool."""
+    """Scan uploads/candidate_pool and index any new resume files into candidate applicant pool.
+    Also purges vector store & candidate records for files that were deleted from candidate_pool.
+    """
     if not os.path.exists(UPLOAD_DIR):
         return
+
+    current_files = {fname for fname in os.listdir(UPLOAD_DIR) if os.path.isfile(os.path.join(UPLOAD_DIR, fname))}
+
+    # Reconcile vector store & memory DB against current files on disk
+    store.reconcile_with_files(current_files)
 
     existing = store.list_all_candidates()
     existing_files = {r.file_name for r in existing}
 
-    for fname in os.listdir(UPLOAD_DIR):
+    for fname in current_files:
         fpath = os.path.join(UPLOAD_DIR, fname)
-        if os.path.isfile(fpath) and fname not in existing_files:
+        if fname not in existing_files:
             try:
                 with open(fpath, "rb") as f:
                     content = f.read()
                 raw_text = extract_text_from_file(content, fname)
                 if raw_text and raw_text.strip():
-                    # Fast local extraction without invoking LLM API before HR action
-                    from backend.ai_parser import fallback_parse_resume
-                    profile = fallback_parse_resume(raw_text, fname)
+                    from backend.ai_parser import parse_resume_with_gemini
+                    profile = parse_resume_with_gemini(raw_text, fname)
                     cand_id = f"cand-{uuid.uuid4().hex[:8]}"
 
                     record = CandidateRecord(
@@ -90,7 +97,6 @@ def sync_uploads_directory(store: VectorStore):
                         created_at=datetime.datetime.now().isoformat()
                     )
                     store.add_candidate(record)
-                    # Auto submit application for active jobs
                     for job in JOBS_DATABASE:
                         APPLICATIONS_DATABASE.append(
                             JobApplication(
@@ -152,10 +158,9 @@ def get_api_key_status():
     """Check if Google AI API Key is active."""
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     has_key = bool(key and key.strip())
-    masked_key = f"{key[:6]}...{key[-4:]}" if has_key and len(key) > 10 else ("Configured" if has_key else "Not Set")
     return {
         "has_api_key": has_key,
-        "masked_key": masked_key,
+        "status": "Active" if has_key else "Not Set",
         "genai_sdk_available": GENAI_AVAILABLE
     }
 
@@ -178,14 +183,87 @@ def set_api_key_endpoint(req: ApiKeyRequest):
 
 
 def parse_job_description_with_ai(raw_text: str) -> JobDescription:
-    """Parse unformatted raw job text into structured JobDescription model using Google free LLM models."""
+    """Parse unformatted raw job text into structured JobDescription model using Google free LLM models with persistent caching.
+    
+    Two-pass strategy:
+    1. Extract structured key requirements (skills, experience, qualifications, education) as JDKeyRequirements
+    2. Extract full JobDescription with all scoring fields
+    """
+    # 1. Check persistent cache
+    try:
+        from backend.cache import cache_manager
+        cached_jd = cache_manager.get_cached_jd(raw_text)
+        if cached_jd:
+            print("⚡ Cache hit for Job Description extraction")
+            return cached_jd
+    except Exception as e:
+        print(f"JD cache lookup notice: {e}")
+
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if api_key and GENAI_AVAILABLE:
         free_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
         client = genai.Client(api_key=api_key)
-        prompt = f"""
+
+        # --- Pass 1: Extract structured key requirements for HR criteria preview ---
+        jd_key_req: Optional[JDKeyRequirements] = None
+        key_req_prompt = f"""
+You are an expert HR recruiter analyzing a job description.
+Extract structured hiring criteria from the following job text. Categorize requirements clearly into mandatory vs preferred, and extract hard criteria (knockout rules).
+
+IMPORTANT: Actively look for and extract cutting-edge and domain-specific skills, such as "Large Language Models", "Generative AI", "Text-to-Speech", "Prompt Engineering", "Machine Learning", and specific industry domain knowledge if present. Do not limit extraction to just generic software engineering skills.
+
+Return a JSON object matching this schema:
+- key_skills: list of must-have technical/functional skills (top 8 max, including specific AI/ML technologies if mentioned)
+- preferred_skills: list of nice-to-have skills (top 5 max)
+- key_experience: list of key experience bullet points required (top 5 max, short phrases)
+- key_qualifications: list of key qualifications/certifications required (top 5 max)
+- academic_qualifications: list of academic background/degree/major requirements (e.g. "Bachelor in CS/IT/STEM", "Master's Degree in Data Science")
+- required_certifications: list of professional certifications required or preferred (e.g. "PMP", "AWS Certified", "CPA")
+- education_level: minimum education level required (e.g. "Bachelor's Degree", "Master's Degree", "Diploma")
+- min_years_experience: minimum years of professional experience as a number (float)
+- skill_weights: dict mapping each key skill to an importance weight (10-100, where 100 = most critical)
+- hard_criteria: object with non-negotiable knockout rules:
+    * mandatory_nationality: specific required citizenship/work status if mandated (e.g. "Singapore Citizen/PR", "US Citizen/Green Card", or "Any")
+    * strict_degree_required: boolean true if academic degree is strict non-negotiable
+    * strict_min_years: minimum required experience as float
+    * hard_skills: list of mandatory non-negotiable skills
+
+Job Description:
+\"\"\"
+{raw_text[:5000]}
+\"\"\"
+"""
+        for model_name in free_models:
+            try:
+                kr_response = client.models.generate_content(
+                    model=model_name,
+                    contents=key_req_prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=JDKeyRequirements,
+                        temperature=0.1,
+                    ),
+                )
+                if kr_response.text:
+                    kr_data = json.loads(kr_response.text)
+                    jd_key_req = JDKeyRequirements(**kr_data)
+                    break
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    break
+
+        # --- Pass 2: Extract full JobDescription ---
+        jd_prompt = f"""
 You are an expert HR recruiter. Extract structured job position details from the following raw job text into JSON matching the schema.
-Include estimated salary range (salary_min, salary_max), target_candidate_count for interview shortlist, skill_weights for each skill (10-100%), education_level, required_availability, and required_nationality.
+Include estimated salary range (salary_min, salary_max), target_candidate_count for interview shortlist,
+skill_weights for each skill (10-100%), education_level, academic_qualifications, required_certifications, required_availability, and required_nationality.
+
+CRITICAL: Extract specific advanced technology and AI domain skills (e.g., Large Language Models, Generative AI, Text-to-Speech) into the required_skills and preferred_skills lists if they are mentioned.
+
+For required_availability use one of: Immediate, 2 Weeks Notice, 1 Month Notice, Any.
+For required_nationality use one of: Singapore Citizen/PR, US Citizen/Green Card, Employment Pass, Any.
+If the job explicitly states "Singaporeans/PR only" or similar, set required_nationality="Singapore Citizen/PR" and specify hard_criteria.mandatory_nationality="Singapore Citizen/PR".
 
 Job Text:
 \"\"\"
@@ -196,7 +274,7 @@ Job Text:
             try:
                 response = client.models.generate_content(
                     model=model_name,
-                    contents=prompt,
+                    contents=jd_prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
                         response_schema=JobDescription,
@@ -209,15 +287,40 @@ Job Text:
                     jd.raw_text = raw_text
                     if not jd.id:
                         jd.id = f"job-custom-{uuid.uuid4().hex[:6]}"
+                    # Attach key requirements preview
+                    if jd_key_req:
+                        jd.jd_key_requirements = jd_key_req
+                        if jd_key_req.key_skills and not jd.required_skills:
+                            jd.required_skills = jd_key_req.key_skills
+                        if jd_key_req.preferred_skills and not jd.preferred_skills:
+                            jd.preferred_skills = jd_key_req.preferred_skills
+                        if jd_key_req.skill_weights and not jd.skill_weights:
+                            jd.skill_weights = jd_key_req.skill_weights
+                        if jd_key_req.min_years_experience and not jd.min_years_experience:
+                            jd.min_years_experience = jd_key_req.min_years_experience
+                        if jd_key_req.education_level and not jd.education_level:
+                            jd.education_level = jd_key_req.education_level
+                        if jd_key_req.academic_qualifications and not jd.academic_qualifications:
+                            jd.academic_qualifications = jd_key_req.academic_qualifications
+                        if jd_key_req.required_certifications and not jd.required_certifications:
+                            jd.required_certifications = jd_key_req.required_certifications
+                        if jd_key_req.hard_criteria and not jd.hard_criteria:
+                            jd.hard_criteria = jd_key_req.hard_criteria
+                    
+                    # Store in cache
+                    try:
+                        from backend.cache import cache_manager
+                        cache_manager.set_cached_jd(raw_text, jd)
+                    except Exception as e:
+                        print(f"Failed to save JD to cache: {e}")
+                    
                     return jd
             except Exception as e:
                 err_str = str(e)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                     break
 
-
     # Fallback parser logic
-
     lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
     title = lines[0] if lines else "Custom HR Job Position"
     if len(title) > 60:
@@ -238,24 +341,42 @@ Job Text:
     req_skills = found[:5] if found else ["General Engineering"]
     weights = {s: 100.0 / len(req_skills) for s in req_skills}
 
-    return JobDescription(
+    fallback_key_req = JDKeyRequirements(
+        key_skills=req_skills,
+        preferred_skills=found[5:8] if len(found) > 5 else [],
+        key_experience=[f"Minimum {min_exp:.0f} years of relevant professional experience"],
+        key_qualifications=[],
+        academic_qualifications=["Bachelor's Degree in Computer Science or related STEM field"],
+        education_level="Bachelor's Degree",
+        min_years_experience=min_exp,
+        skill_weights=weights
+    )
+
+    fallback_jd = JobDescription(
         id=f"job-custom-{uuid.uuid4().hex[:6]}",
         title=title,
-        department="HR Provided",
+        department="Engineering",
         required_skills=req_skills,
         preferred_skills=found[5:8] if len(found) > 5 else [],
         skill_weights=weights,
         min_years_experience=min_exp,
-        salary_min=100000.0,
-        salary_max=140000.0,
-        salary_currency="$",
+        salary_min=100000,
+        salary_max=150000,
         target_candidate_count=3,
         education_level="Bachelor's Degree",
-        required_availability="Immediate",
-        required_nationality="Any",
+        academic_qualifications=["Bachelor's Degree in Computer Science or related STEM field"],
         description=raw_text[:1000],
-        raw_text=raw_text
+        raw_text=raw_text,
+        jd_key_requirements=fallback_key_req
     )
+    
+    try:
+        from backend.cache import cache_manager
+        cache_manager.set_cached_jd(raw_text, fallback_jd)
+    except Exception:
+        pass
+
+    return fallback_jd
 
 
 @app.get("/api/health")
@@ -281,7 +402,7 @@ async def upload_resume(file: UploadFile = File(...)):
         if not raw_text.strip():
             raise HTTPException(status_code=400, detail="Could not extract readable text from uploaded file.")
 
-        # Save copy locally into C:\Users\User\Desktop\Project\DB_Hackathon_2016\uploads\resumes
+        # Save copy locally into uploads/candidate_pool
         save_path = os.path.join(UPLOAD_DIR, file_name)
         with open(save_path, "wb") as f:
             f.write(contents)
@@ -312,7 +433,7 @@ async def upload_resume(file: UploadFile = File(...)):
 
 @app.post("/api/batch-process-resumes")
 def batch_process_resumes(req: BatchProcessRequest):
-    """Batch process PDF resumes from local dataset path C:\\Users\\User\\Desktop\\Project\\DB_Hackathon_2016\\resumes\\data\\data and store in uploads\\resumes."""
+    r"""Batch process PDF resumes from local dataset path C:\Users\User\Desktop\Project\DB_Hackathon_2016\resumes\data\data and store in uploads\candidate_pool."""
     base_dir = req.dataset_path or r"C:\Users\User\Desktop\Project\DB_Hackathon_2016\resumes\data\data"
     if not os.path.exists(base_dir):
         raise HTTPException(status_code=404, detail=f"Dataset path not found: {base_dir}")
@@ -349,7 +470,7 @@ def batch_process_resumes(req: BatchProcessRequest):
             with open(fpath, "rb") as f:
                 content = f.read()
             
-            # Save copy to C:\Users\User\Desktop\Project\DB_Hackathon_2016\uploads\resumes
+            # Save copy to uploads/candidate_pool
             upload_target_path = os.path.join(UPLOAD_DIR, file_identifier)
             with open(upload_target_path, "wb") as f_out:
                 f_out.write(content)
@@ -400,13 +521,58 @@ def batch_process_resumes(req: BatchProcessRequest):
 
 @app.get("/api/candidates", response_model=List[CandidateRecord])
 def get_all_candidates():
-    """List all parsed candidates."""
+    """Sync candidates directory and list all active candidates."""
+    sync_uploads_directory(vector_store)
     return vector_store.list_all_candidates()
+
+
+@app.post("/api/candidates/sync")
+def sync_candidates_endpoint():
+    """Reconcile and sync candidate pool files on disk with vector store and memory database."""
+    sync_uploads_directory(vector_store)
+    return {
+        "status": "success",
+        "total_candidates": len(vector_store.list_all_candidates()),
+        "candidates": [{"id": r.id, "name": r.profile.full_name, "file": r.file_name} for r in vector_store.list_all_candidates()]
+    }
+
+
+@app.get("/api/cache/stats")
+def get_cache_stats():
+    """Get persistent LLM cache statistics."""
+    from backend.cache import cache_manager
+    return cache_manager.get_stats()
+
+
+@app.post("/api/cache/clear")
+def clear_cache_endpoint():
+    """Clear all persistent LLM cache entries."""
+    from backend.cache import cache_manager
+    cache_manager.clear_all()
+    return {
+        "status": "success",
+        "message": "Persistent LLM cache cleared successfully."
+    }
+
+
+@app.post("/api/candidates/clear-all")
+def clear_all_candidates_endpoint():
+    """Purge all vector embeddings, candidate records, and applications."""
+    vector_store.reset_all()
+    from backend.cache import cache_manager
+    cache_manager.clear_all()
+    global APPLICATIONS_DATABASE
+    APPLICATIONS_DATABASE.clear()
+    return {
+        "status": "success",
+        "message": "All candidate vector embeddings, candidate records, and LLM cache purged successfully."
+    }
 
 
 @app.get("/api/candidates/{candidate_id}", response_model=CandidateRecord)
 def get_candidate(candidate_id: str):
     """Retrieve specific candidate details."""
+    sync_uploads_directory(vector_store)
     record = vector_store.get_candidate(candidate_id)
     if not record:
         raise HTTPException(status_code=404, detail="Candidate not found")
@@ -540,11 +706,39 @@ def get_ranked_applicants(job_id: str):
 @app.post("/api/match", response_model=List[MatchAnalysis])
 def match_candidates(job: JobDescription, top_k: int = 50):
     """Match stored candidates against a Job Description and rank them with HR proposals."""
+    sync_uploads_directory(vector_store)
     if not vector_store.list_all_candidates():
         return []
     
     match_results = matcher.match_candidates_for_job(job, top_k=top_k)
     return match_results
+
+
+@app.get("/api/jobs/{job_id}/rank-all-candidates", response_model=List[MatchAnalysis])
+def rank_all_candidates_for_job(job_id: str):
+    """Rank ALL candidates in the pool against job_id requirements (not limited to applicants)."""
+    sync_uploads_directory(vector_store)
+    job = next((j for j in JOBS_DATABASE if j.id == job_id), None)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job position not found")
+
+    all_candidates = vector_store.list_all_candidates()
+    if not all_candidates:
+        return []
+
+    # Build application status map to enrich results where candidates did apply
+    app_status_map = {a.candidate_id: a.status for a in APPLICATIONS_DATABASE if a.job_id == job_id}
+
+    ranked = matcher.match_candidates_for_job(job_description=job, candidate_records=all_candidates)
+
+    for r in ranked:
+        # Mark applied candidates with their actual status; others show as "In Pool"
+        if r.candidate_id in app_status_map:
+            r.selection_status = app_status_map[r.candidate_id]
+        else:
+            r.selection_status = "In Pool"
+
+    return ranked
 
 
 # Mount static files directory if present
