@@ -16,7 +16,7 @@
       ],
       "jinja": true,
       "justMyCode": true,
-      "python": "${workspaceFolder}/venv/Scripts/python.exe",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
       "cwd": "${workspaceFolder}"
     },
     {

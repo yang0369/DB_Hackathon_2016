@@ -69,5 +69,76 @@
       },
       "hard_criteria": null
     }
+  },
+  "e334c568782c44d8532a66f48d0af464e3490f8069e95a6da116c26251fffcf7": {
+    "id": "job-custom-25a02f",
+    "title": "Position Title: AI Engineer",
+    "department": "Engineering",
+    "required_skills": [
+      "Python",
+      "SQL",
+      "AWS",
+      "GCP",
+      "Azure"
+    ],
+    "preferred_skills": [
+      "Git",
+      "CI/CD",
+      "Java"
+    ],
+    "skill_weights": {
+      "Python": 20.0,
+      "SQL": 20.0,
+      "AWS": 20.0,
+      "GCP": 20.0,
+      "Azure": 20.0
+    },
+    "min_years_experience": 3.0,
+    "salary_min": 100000.0,
+    "salary_max": 150000.0,
+    "salary_currency": "$",
+    "target_candidate_count": 3,
+    "education_level": "Bachelor's Degree",
+    "academic_qualifications": [
+      "Bachelor's Degree in Computer Science or related STEM field"
+    ],
+    "required_certifications": [],
+    "required_availability": "Any",
+    "required_nationality": "Any",
+    "hard_criteria": null,
+    "description": "Position Title: AI Engineer\nDepartment: Private Bank\n\nDetails of the Division and Team:\n\nWe are seeking a dedicated and experienced individual to join our team as a AI Engineer supporting the Emerging Markets (EM) region. The successful candidate will be responsible for developing machine learning algorithms, creating data pipelines, implementing AI infrastructure, and optimizing model performance. They ensure models are scalable, reliable, and integrated into production systems while collaborating with cross-functional teams to solve complex business problems.\n\nBased in Singapore, you will act as the primary point of contact for all AI Engineering applied initiatives within the region, ensuring timely delivery of AI based or related solutions. Your role will involve collaborating closely with regional stakeholders and global teams to understand business requirements, also work with the vendors where applicable and translating them into actionable AI based solutions. Proactively engage",
+    "raw_text": "Position Title: AI Engineer\nDepartment: Private Bank\n\nDetails of the Division and Team:\n\nWe are seeking a dedicated and experienced individual to join our team as a AI Engineer supporting the Emerging Markets (EM) region. The successful candidate will be responsible for developing machine learning algorithms, creating data pipelines, implementing AI infrastructure, and optimizing model performance. They ensure models are scalable, reliable, and integrated into production systems while collaborating with cross-functional teams to solve complex business problems.\n\nBased in Singapore, you will act as the primary point of contact for all AI Engineering applied initiatives within the region, ensuring timely delivery of AI based or related solutions. Your role will involve collaborating closely with regional stakeholders and global teams to understand business requirements, also work with the vendors where applicable and translating them into actionable AI based solutions. Proactively engage in innovation, learning and application of the knowledge.\n\nWhat we will offer you:\n\nA healthy, engaged and well-supported workforce is better equipped to do their best work and, more importantly, enjoy their lives inside and outside the workplace. That’s why we are committed to providing an environment with your development and wellbeing at its center.\n\nYou can expect:\n\nFlexible benefits plan including virtual doctor consultation services\nComprehensive leave benefits\nGender Neutral Parental Leave\nHybrid working arrangement\n25 days of annual paid leave, plus public holiday\nA culture of continuous learning to aid progression\n\n\nYour key responsibilities:\n\nCollaborate with EM region stakeholders to identify Business needs and translate them into workable production ready solution.\nTake ownership of the machine learning lifecycle, from designing, training, and testing machine learning models and deep learning neural networks to automate tasks and generate insights.\nCreating data transformation infrastructure, managing data ingestion, and preparing data for training.\nTransforming models into production-ready APIs, microservices, and software applications. Monitoring model performance, ensuring scalability, and updating systems to maintain accuracy.\nBuilding and maintaining the necessary IT infrastructure (cloud platforms like AWS/GCP, containerization) for AI development.\nImplement algorithms for personalization and anomaly detection aligned with compliance requirements.\nWorking with data scientists, engineers, and product managers to define AI strategies and implement features.\nEnsure robust documentation of AI processes, standards, and controls in line with the Bank’s data governance policies.\nParticipate in Agile ceremonies and contribute to sprint planning, backlog grooming, and delivery cycles.\nStay current with emerging AI trends, including Generative AI and large language models (LLMs), and be prepared to integrate these advanced techniques into solutions where they can drive significant business value.\nSupport the production of scalable and optimised AI/machine learning (ML) models\nFocus on building algorithms for the extraction, transformation and loading of large volumes of real time, unstructured data to deploy AI/ML solutions from theoretical data science models.\nRun experiments to test the performance of deployed models and identifies and resolves bugs that arise in the process.\nWork in a team setting and apply knowledge in statistics, scripting and programming languages required by the firm.\nWork with the relevant software platforms in which the models are deployed.\n\n\nYour skills and experience:\n\nBachelor’s or Master’s degree in Artificial Intelligence / Data Science / Computer Science / Information Technology / Programming & System Analysis / Computer Studies / data science or a related field, with a minimum of 3 years of professional experience as a AI Engineer\nProficient in Python, with a strong command of advanced syntax, popular libraries (e.g., Scikit-Learn), and the ability to extend existing structures. Exhibits proficiency in Object-Oriented Programming (OOP) by implementing S.O.L.I.D. principles and in data structures & algorithms by analysing complexities and making efficient choices (e.g., Numpy vs. Pandas).\nProficient in applying Generative AI by using, understanding, and tuning large language models (LLMs) for diverse scenarios. Skilled in architecting solutions that augment core models with external logic and tools (e.g., Retrieval-Augmented Generation or MCP) and in developing complex, end-to-end multi-agent systems using services like ADK, DialogFlow, or equivalent cloud services.\nDemonstrates basic knowledge and practical experience in core software engineering practices, including navigating operating systems, programming and querying languages (e.g., Java, SQL), version control (e.g., Git), development methodologies (Agile, Waterfall), CI/CD concepts (e.g., Jenkins), testing principles, and monitoring. Possesses a foundational understanding of design patterns, software architecture, and core cloud technologies (e.g., GCP, AWS, or Azure).\nDemonstrates expert-level knowledge in the theoretical and practical application of machine learning. This includes mathematical understanding of both traditional and deep learning algorithms, expert skill in hyperparameter optimization, and the ability to evaluate model performance using task-specific losses and scores. Possesses an expert grasp of the underlying mathematics and statistics essential for AI/ML, including distributions, statistical methods, and probability theory.\nCapable of conducting code reviews for team members if needed\nShows proficiency in the end-to-end data lifecycle, including advanced data engineering across traditional and cloud databases with a focus on query optimization. Highly skilled in data preprocessing, from comprehensive cleaning and encoding to advanced feature creation. A proficient communicator, capable of translating complex technical findings into clear, influential data stories for diverse audiences, including senior leadership. Possesses a foundational ability to create data visualizations (e.g., using Tableau) to support insights.\nStrong analytical and problem-solving skills and Excellent communication skills, both written and verbal.\nAbility to work independently and collaboratively in the context of global cross-functional teams. Familiarity with Agile methodologies and user story documentation.",
+    "jd_key_requirements": {
+      "key_skills": [
+        "Python",
+        "SQL",
+        "AWS",
+        "GCP",
+        "Azure"
+      ],
+      "preferred_skills": [
+        "Git",
+        "CI/CD",
+        "Java"
+      ],
+      "key_experience": [
+        "Minimum 3 years of relevant professional experience"
+      ],
+      "key_qualifications": [],
+      "academic_qualifications": [
+        "Bachelor's Degree in Computer Science or related STEM field"
+      ],
+      "required_certifications": [],
+      "education_level": "Bachelor's Degree",
+      "min_years_experience": 3.0,
+      "skill_weights": {
+        "Python": 20.0,
+        "SQL": 20.0,
+        "AWS": 20.0,
+        "GCP": 20.0,
+        "Azure": 20.0
+      },
+      "hard_criteria": null
+    }
   }
 }

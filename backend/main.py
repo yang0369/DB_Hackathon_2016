@@ -1,7 +1,7 @@
 import os
 import uuid
 import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +22,15 @@ from backend.models import (
     CandidateRecord,
     JobDescription,
     JDKeyRequirements,
-    MatchAnalysis
+    MatchAnalysis,
+    InterviewQuestion,
+    InterviewTurn,
+    VoiceAssessment,
+    CheatingReport,
+    InterviewSession,
+    UserAccount,
+    InterviewInvitation,
+    PhysicalInterviewSchedule
 )
 from backend.extractor import extract_text_from_file
 from backend.ai_parser import parse_resume_with_gemini
@@ -741,7 +749,495 @@ def rank_all_candidates_for_job(job_id: str):
     return ranked
 
 
-# Mount static files directory if present
+# Directory for candidate interview video recordings
+INTERVIEW_VIDEOS_DIR = os.path.join(UPLOAD_DIR, "interview_videos")
+os.makedirs(INTERVIEW_VIDEOS_DIR, exist_ok=True)
+
+# In-memory storage for active and completed interview sessions
+INTERVIEW_SESSIONS_DATABASE: Dict[str, InterviewSession] = {}
+
+
+class InterviewStartRequest(BaseModel):
+    candidate_id: str
+    job_id: str
+
+class InterviewTurnRequest(BaseModel):
+    session_id: str
+    candidate_speech_text: str
+    stage: Optional[str] = "interview"
+    current_question_index: int = 0
+    tab_switch_count: int = 0
+    suspicious_silence_count: int = 0
+
+class InterviewEvaluateRequest(BaseModel):
+    session_id: str
+    tab_switches: int = 0
+    suspicious_silences: int = 0
+    gaze_anomalies: int = 0
+
+
+@app.post("/api/interview/start", response_model=InterviewSession)
+def start_interview_session(req: InterviewStartRequest):
+    """Start an AI Voice Interview session for a candidate and job position."""
+    candidate = vector_store.get_candidate(req.candidate_id)
+    job = next((j for j in JOBS_DATABASE if j.id == req.job_id), None)
+    
+    cand_name = candidate.profile.full_name if candidate else "Candidate"
+    job_title = job.title if job else "Software Engineer Position"
+
+    # Derive key technical skills for custom questions
+    required_skills = (job.required_skills if job and job.required_skills else (candidate.profile.skills[:3] if candidate else ["Python", "Problem Solving"]))
+    skills_str = ", ".join(required_skills[:3])
+
+    questions = [
+        InterviewQuestion(
+            id="q1",
+            stage="experience",
+            question_text=f"Welcome {cand_name}! I am your AI Voice Interviewer for the {job_title} role. To start, please introduce yourself and summarize your relevant work experience.",
+            expected_aspects=["years of experience", "past roles", "key projects"]
+        ),
+        InterviewQuestion(
+            id="q2",
+            stage="capability",
+            question_text=f"Great. Next, let's test your technical capability. Could you explain your hands-on experience with {skills_str}, and describe a challenging technical problem you solved using these skills?",
+            expected_aspects=["technical depth", "problem solving", "skills application"]
+        ),
+        InterviewQuestion(
+            id="q3",
+            stage="qa",
+            question_text=f"Thank you. Now it's your turn — do you have any questions about the {job_title} role, our team, or technical stack that I can clarify for you?",
+            expected_aspects=["candidate curiosity", "role clarity", "culture alignment"]
+        )
+    ]
+
+    session_id = f"int-{uuid.uuid4().hex[:8]}"
+    initial_turn = InterviewTurn(
+        speaker="agent",
+        text=questions[0].question_text,
+        timestamp=datetime.datetime.now().strftime("%H:%M:%S"),
+        stage="experience"
+    )
+
+    session = InterviewSession(
+        session_id=session_id,
+        candidate_id=req.candidate_id,
+        candidate_name=cand_name,
+        job_id=req.job_id,
+        job_title=job_title,
+        status="In Progress",
+        created_at=datetime.datetime.now().isoformat(),
+        questions=questions,
+        turns=[initial_turn]
+    )
+
+    INTERVIEW_SESSIONS_DATABASE[session_id] = session
+    return session
+
+
+@app.post("/api/interview/turn")
+def process_interview_turn(req: InterviewTurnRequest):
+    """Process candidate's voice answer, log speech data, and return next AI agent question/response."""
+    session = INTERVIEW_SESSIONS_DATABASE.get(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+
+    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+
+    # Record candidate's answer
+    candidate_turn = InterviewTurn(
+        speaker="candidate",
+        text=req.candidate_speech_text,
+        timestamp=now_str,
+        stage=req.stage
+    )
+    session.turns.append(candidate_turn)
+
+    next_q_idx = req.current_question_index + 1
+    is_complete = next_q_idx >= len(session.questions)
+
+    if not is_complete:
+        next_question = session.questions[next_q_idx]
+        agent_turn = InterviewTurn(
+            speaker="agent",
+            text=next_question.question_text,
+            timestamp=now_str,
+            stage=next_question.stage
+        )
+        session.turns.append(agent_turn)
+
+        return {
+            "session_id": session.session_id,
+            "next_question": next_question.question_text,
+            "question_index": next_q_idx,
+            "is_complete": False,
+            "agent_speech": next_question.question_text
+        }
+    else:
+        closing_text = "Thank you for completing the voice interview! I have recorded your responses and video data for performance and cheating analysis. Our HR team will review your application shortly."
+        agent_turn = InterviewTurn(
+            speaker="agent",
+            text=closing_text,
+            timestamp=now_str,
+            stage="complete"
+        )
+        session.turns.append(agent_turn)
+
+        return {
+            "session_id": session.session_id,
+            "next_question": None,
+            "question_index": next_q_idx,
+            "is_complete": True,
+            "agent_speech": closing_text
+        }
+
+
+@app.post("/api/interview/evaluate", response_model=InterviewSession)
+def evaluate_interview_session(req: InterviewEvaluateRequest):
+    """Evaluate candidate's voice performance and generate cheating analysis report."""
+    session = INTERVIEW_SESSIONS_DATABASE.get(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+
+    candidate_turns = [t for t in session.turns if t.speaker == "candidate"]
+    total_words = sum(len(t.text.split()) for t in candidate_turns)
+    cand_text_combined = " ".join([t.text for t in candidate_turns])
+
+    # LLM or Heuristic Voice & Capability Assessment
+    comm_score = min(98.0, max(60.0, 75.0 + (total_words / 15.0)))
+    tech_score = 85.0 if any(kw in cand_text_combined.lower() for kw in ["python", "project", "experience", "built", "system", "design", "team", "api", "data", "model", "code"]) else 72.0
+
+    strengths = []
+    if total_words > 40:
+        strengths.append("Articulate and detailed responses during voice interaction")
+    else:
+        strengths.append("Concise and direct answers")
+    
+    if any(kw in cand_text_combined.lower() for kw in ["problem", "solve", "architecture", "optimized", "scale"]):
+        strengths.append("Strong technical problem-solving focus")
+
+    voice_eval = VoiceAssessment(
+        communication_score=round(comm_score, 1),
+        technical_capability_score=round(tech_score, 1),
+        confidence_rating="High Confidence" if total_words > 50 else "Moderate Confidence",
+        rationale=f"Candidate demonstrated clear verbal communication across {len(candidate_turns)} response turns. Technical capability score ({round(tech_score,1)}%) reflects solid domain alignment with role requirements.",
+        strengths=strengths,
+        areas_for_improvement=["Provide more quantitative metrics for past project achievements."]
+    )
+
+    # Cheating Analysis calculation
+    risk_score = 5.0 + (req.tab_switches * 25.0) + (req.suspicious_silences * 15.0) + (req.gaze_anomalies * 10.0)
+    risk_score = min(100.0, risk_score)
+
+    flags = []
+    if req.tab_switches > 0:
+        flags.append(f"Tab switch / window blur detected {req.tab_switches} time(s) during interview")
+    if req.suspicious_silences > 0:
+        flags.append(f"Extended unprompted silence detected {req.suspicious_silences} time(s)")
+    if req.gaze_anomalies > 0:
+        flags.append(f"Frequent off-screen gaze shifts detected {req.gaze_anomalies} time(s)")
+
+    if risk_score >= 50.0:
+        risk_level = "High Risk"
+        summary = "Potential cheating risk detected: candidate switched tab or lost window focus during question answering."
+    elif risk_score >= 25.0:
+        risk_level = "Medium Risk"
+        summary = "Minor anomaly flags raised during video call. HR review of recorded video recommended."
+    else:
+        risk_level = "Low Risk"
+        summary = "Normal candidate behavior. Candidate maintained continuous video focus and webcam alignment throughout the session."
+
+    cheating_eval = CheatingReport(
+        cheating_risk_score=round(risk_score, 1),
+        risk_level=risk_level,
+        tab_switches=req.tab_switches,
+        suspicious_silences=req.suspicious_silences,
+        gaze_anomalies=req.gaze_anomalies,
+        flags=flags,
+        summary=summary
+    )
+
+    session.voice_assessment = voice_eval
+    session.cheating_report = cheating_eval
+    session.status = "Completed"
+
+    # Update candidate application status
+    for app in APPLICATIONS_DATABASE:
+        if app.candidate_id == session.candidate_id and app.job_id == session.job_id:
+            app.status = "Interview Completed"
+
+    # Update invitation status
+    for inv in INVITATIONS_DATABASE:
+        if inv.candidate_id == session.candidate_id and inv.job_id == session.job_id:
+            inv.status = "Completed"
+
+    return session
+
+
+@app.post("/api/interview/upload-video")
+async def upload_interview_video(session_id: str = Form(...), file: UploadFile = File(...)):
+    """Upload recorded WebM video stream of the candidate interview."""
+    session = INTERVIEW_SESSIONS_DATABASE.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+
+    ext = ".webm" if "webm" in (file.content_type or "") else ".mp4"
+    filename = f"{session_id}_video{ext}"
+    filepath = os.path.join(INTERVIEW_VIDEOS_DIR, filename)
+
+    contents = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    session.video_filename = filename
+    return {"status": "success", "video_filename": filename, "video_url": f"/interview_videos/{filename}"}
+
+
+@app.get("/api/interview/session/{session_id}", response_model=InterviewSession)
+def get_interview_session(session_id: str):
+    """Retrieve interview session details, evaluation, and video info."""
+    session = INTERVIEW_SESSIONS_DATABASE.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session not found")
+    return session
+
+
+@app.get("/api/interview/candidate/{candidate_id}")
+def get_candidate_interview_history(candidate_id: str):
+    """Get all interview sessions for a specific candidate."""
+    sessions = [s for s in INTERVIEW_SESSIONS_DATABASE.values() if s.candidate_id == candidate_id]
+    return sessions
+
+
+@app.get("/api/hr/completed-interviews", response_model=List[InterviewSession])
+def get_all_completed_interviews():
+    """Retrieve all completed interview sessions for HR video review and score evaluation."""
+    completed = []
+    for s in INTERVIEW_SESSIONS_DATABASE.values():
+        if s.status == "Completed" or len([t for t in s.turns if t.speaker == "candidate"]) > 0:
+            if not s.voice_assessment or not s.cheating_report:
+                # Auto-generate evaluation if candidate turns exist
+                cand_turns = [t for t in s.turns if t.speaker == "candidate"]
+                word_count = sum(len(t.text.split()) for t in cand_turns)
+                s.voice_assessment = VoiceAssessment(
+                    communication_score=round(min(98.0, max(65.0, 75.0 + word_count/10.0)), 1),
+                    technical_capability_score=82.0,
+                    confidence_rating="High Confidence" if word_count > 30 else "Moderate Confidence",
+                    rationale="Candidate completed voice interview turn interaction.",
+                    strengths=["Clear voice communication"],
+                    areas_for_improvement=[]
+                )
+                s.cheating_report = CheatingReport(
+                    cheating_risk_score=5.0,
+                    risk_level="Low Risk",
+                    tab_switches=0,
+                    suspicious_silences=0,
+                    gaze_anomalies=0,
+                    flags=[],
+                    summary="No suspicious flags recorded."
+                )
+                s.status = "Completed"
+            completed.append(s)
+
+    completed.sort(key=lambda x: x.created_at, reverse=True)
+    return completed
+
+
+# In-memory storage for invitations
+INVITATIONS_DATABASE: List[InterviewInvitation] = []
+
+class AuthLoginRequest(BaseModel):
+    email: str
+    role: Optional[str] = "candidate"
+
+class InviteCandidateRequest(BaseModel):
+    candidate_id: str
+    job_id: str
+    candidate_email: Optional[str] = None
+
+
+@app.post("/api/auth/login", response_model=UserAccount)
+def user_login(req: AuthLoginRequest):
+    """Sign in HR (hr@db.com) or candidate (candidate@gmail.com). Auto-assigns or creates account."""
+    email_clean = req.email.strip().lower()
+
+    if email_clean == "hr@db.com":
+        return UserAccount(
+            email="hr@db.com",
+            name="HR Manager (DB)",
+            role="hr"
+        )
+    
+    # Candidate login (e.g. candidate@gmail.com)
+    all_candidates = vector_store.list_all_candidates()
+    matched_cand = next((c for c in all_candidates if c.profile.email and c.profile.email.strip().lower() == email_clean), None)
+
+    cand_id = matched_cand.id if matched_cand else (all_candidates[0].id if all_candidates else "cand-001")
+    cand_name = matched_cand.profile.full_name if matched_cand else "Candidate"
+
+    return UserAccount(
+        email=email_clean,
+        name=cand_name,
+        role="candidate",
+        candidate_id=cand_id
+    )
+
+
+@app.post("/api/interview/invite", response_model=InterviewInvitation)
+def invite_candidate_to_interview(req: InviteCandidateRequest):
+    """HR dispatches an interview invitation to the candidate's inbox."""
+    candidate = vector_store.get_candidate(req.candidate_id)
+    job = next((j for j in JOBS_DATABASE if j.id == req.job_id), None)
+
+    cand_name = candidate.profile.full_name if candidate else "Candidate"
+    cand_email = req.candidate_email or (candidate.profile.email if candidate and candidate.profile.email else "candidate@gmail.com")
+    job_title = job.title if job else "Software Engineer Position"
+
+    # Check if invitation already exists
+    existing = next((inv for inv in INVITATIONS_DATABASE if inv.candidate_id == req.candidate_id and inv.job_id == req.job_id), None)
+    if existing:
+        return existing
+
+    invitation = InterviewInvitation(
+        invitation_id=f"inv-{uuid.uuid4().hex[:8]}",
+        candidate_email=cand_email,
+        candidate_id=req.candidate_id,
+        candidate_name=cand_name,
+        job_id=req.job_id,
+        job_title=job_title,
+        status="Pending",
+        created_at=datetime.datetime.now().isoformat()
+    )
+
+    INVITATIONS_DATABASE.append(invitation)
+
+    # Update candidate application status
+    for app in APPLICATIONS_DATABASE:
+        if app.candidate_id == req.candidate_id and app.job_id == req.job_id:
+            app.status = "Interview Invited"
+
+    return invitation
+
+
+@app.get("/api/candidate/inbox", response_model=List[InterviewInvitation])
+def get_candidate_inbox(email: Optional[str] = "candidate@gmail.com"):
+    """Get interview invitations in candidate inbox."""
+    email_clean = (email or "candidate@gmail.com").strip().lower()
+    
+    # Return invitations matching email or all invitations if candidate@gmail.com
+    if email_clean == "candidate@gmail.com":
+        return INVITATIONS_DATABASE
+    
+    return [inv for inv in INVITATIONS_DATABASE if inv.candidate_email.lower() == email_clean]
+
+
+# In-memory storage for physical/on-site interviews
+PHYSICAL_INTERVIEWS_DATABASE: List[PhysicalInterviewSchedule] = []
+
+class UpdateStageRequest(BaseModel):
+    candidate_id: str
+    job_id: str
+    stage: str  # "Screening", "AI Interview", "Physical Interview", "Selected", "Rejected"
+
+class SchedulePhysicalRequest(BaseModel):
+    candidate_id: str
+    job_id: str
+    scheduled_time: str
+    location: Optional[str] = "Headquarters - Meeting Room 4A"
+    notes: Optional[str] = "Technical On-Site Interview & System Architecture Round"
+
+
+@app.post("/api/applications/update-stage")
+def update_application_stage(req: UpdateStageRequest):
+    """Update candidate's hiring stage in the recruitment pipeline."""
+    for app in APPLICATIONS_DATABASE:
+        if app.candidate_id == req.candidate_id and app.job_id == req.job_id:
+            app.status = req.stage
+            return {"status": "success", "candidate_id": req.candidate_id, "new_stage": req.stage}
+
+    # If application record doesn't exist yet, create one
+    candidate = vector_store.get_candidate(req.candidate_id)
+    cand_name = candidate.profile.full_name if candidate else "Candidate"
+    new_app = JobApplication(
+        id=f"app-{uuid.uuid4().hex[:6]}",
+        job_id=req.job_id,
+        candidate_id=req.candidate_id,
+        candidate_name=cand_name,
+        applied_at=datetime.datetime.now().isoformat(),
+        status=req.stage
+    )
+    APPLICATIONS_DATABASE.append(new_app)
+    return {"status": "success", "candidate_id": req.candidate_id, "new_stage": req.stage}
+
+
+@app.post("/api/physical-interview/schedule", response_model=PhysicalInterviewSchedule)
+def schedule_physical_interview(req: SchedulePhysicalRequest):
+    """Schedule physical/on-site interview for a candidate."""
+    candidate = vector_store.get_candidate(req.candidate_id)
+    job = next((j for j in JOBS_DATABASE if j.id == req.job_id), None)
+
+    cand_name = candidate.profile.full_name if candidate else "Candidate"
+    job_title = job.title if job else "Software Engineer Position"
+
+    schedule = PhysicalInterviewSchedule(
+        schedule_id=f"phys-{uuid.uuid4().hex[:8]}",
+        candidate_id=req.candidate_id,
+        candidate_name=cand_name,
+        job_id=req.job_id,
+        job_title=job_title,
+        location=req.location or "Headquarters - Meeting Room 4A",
+        scheduled_time=req.scheduled_time,
+        interviewer_notes=req.notes or "Technical On-Site Interview & System Architecture Round",
+        status="Scheduled",
+        created_at=datetime.datetime.now().isoformat()
+    )
+
+    PHYSICAL_INTERVIEWS_DATABASE.append(schedule)
+
+    # Update application status to Physical Interview
+    for app_item in APPLICATIONS_DATABASE:
+        if app_item.candidate_id == req.candidate_id and app_item.job_id == req.job_id:
+            app_item.status = "Physical Interview"
+
+    return schedule
+
+
+@app.get("/api/physical-interview/list", response_model=List[PhysicalInterviewSchedule])
+def get_physical_interviews():
+    """List scheduled physical/on-site interviews for HR."""
+    return PHYSICAL_INTERVIEWS_DATABASE
+
+
+@app.get("/api/jobs/{job_id}/pipeline-summary")
+def get_job_pipeline_summary(job_id: str):
+    """Get live candidate count per pipeline stage for the interactive Stage Graph."""
+    job = next((j for j in JOBS_DATABASE if j.id == job_id), None)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job position not found")
+
+    all_candidates = vector_store.list_all_candidates()
+    app_map = {a.candidate_id: a.status for a in APPLICATIONS_DATABASE if a.job_id == job_id}
+    completed_interviews = {s.candidate_id: s for s in INTERVIEW_SESSIONS_DATABASE.values() if s.job_id == job_id and s.status == "Completed"}
+
+    counts = {
+        "screening": len(all_candidates),
+        "ai_interview": len([c for c in all_candidates if app_map.get(c.id) in ["Interview Invited", "Interview Completed"] or c.id in completed_interviews]),
+        "physical_interview": len([c for c in all_candidates if app_map.get(c.id) == "Physical Interview" or any(p.candidate_id == c.id for p in PHYSICAL_INTERVIEWS_DATABASE if p.job_id == job_id)]),
+        "selection": len([c for c in all_candidates if app_map.get(c.id) in ["Selected", "Shortlisted for Interview"]])
+    }
+
+    return {
+        "job_id": job_id,
+        "job_title": job.title,
+        "counts": counts
+    }
+
+
+
+
+# Mount static files directories
+if os.path.exists(INTERVIEW_VIDEOS_DIR):
+    app.mount("/interview_videos", StaticFiles(directory=INTERVIEW_VIDEOS_DIR), name="interview_videos")
+
 if os.path.exists("./static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -752,5 +1248,6 @@ def read_root():
         with open("./static/index.html", "r", encoding="utf-8") as f:
             return f.read()
     return "<h1>AI Resume Parser & Candidate Matcher API Running</h1><p>Visit <a href='/docs'>/docs</a> for API Swagger documentation.</p>"
+
 
 

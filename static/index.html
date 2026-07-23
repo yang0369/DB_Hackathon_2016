@@ -27,71 +27,105 @@
         </div>
       </div>
 
-      <div style="display:flex; gap:10px; align-items:center;">
-        <div class="role-switcher">
-          <button id="roleHrBtn" class="role-btn active" onclick="switchPortalRole('hr')">💼 HR Manager</button>
-          <button id="roleSeekerBtn" class="role-btn" onclick="switchPortalRole('seeker')">👤 Job Seeker</button>
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <div style="font-size:0.78rem; color:var(--text-500); font-weight:600; display:flex; align-items:center; gap:6px;">
+          <span>Account:</span>
+          <strong id="activeUserDisplay" style="color:var(--amber); background:rgba(245,158,11,0.1); padding:3px 8px; border-radius:6px; border:1px solid rgba(245,158,11,0.25);">🔒 Not Logged In</strong>
+        </div>
+        <div class="role-switcher" id="headerAuthControls">
+          <button id="headerSignInBtn" class="role-btn active" style="border-color:var(--cyan); color:var(--cyan);" onclick="openAuthModal()">🔑 Sign In</button>
+          <button id="headerLogoutBtn" class="role-btn" style="display:none; border-color:#f43f5e; color:#fca5a5;" onclick="logoutUser()">🚪 Sign Out</button>
         </div>
       </div>
     </header>
 
 
     <!-- ══════════════════════════════════════════════
-       HR MANAGER PORTAL
+       HR MANAGER PORTAL (Driven by Unified 5-Stage Pipeline Graph)
   ══════════════════════════════════════════════ -->
-    <div id="hrPortalView" class="portal-view active">
+    <div id="hrPortalView" class="portal-view">
 
-      <nav class="sub-nav">
-        <button class="nav-btn active" onclick="switchHrTab('hrPostTab', this)">📝 Post Job</button>
-        <button class="nav-btn" onclick="switchHrTab('hrApplicantsTab', this)">🏆 Rank &amp; Analyze</button>
-        <button class="nav-btn" onclick="switchHrTab('hrRepositoryTab', this)">📁 Candidate Pool</button>
-      </nav>
+      <!-- ── Unified 5-Stage Recruitment Pipeline Graph ────────────────────── -->
+      <div class="pipeline-graph-wrapper" style="margin-top:10px;">
+        <div class="pipeline-graph-header" style="margin-bottom:12px;">
+          <div style="font-size:0.95rem; font-weight:800; color:#fff;">⚡ Recruitment Pipeline</div>
+        </div>
 
-      <!-- HR Tab 1: Post Job Position -->
-      <div id="hrPostTab" class="tab-content active">
+        <div class="pipeline-nodes-container">
+          <!-- Stage 1 Node: Post Job -->
+          <div id="stageNodePostJob" class="stage-node-card active" onclick="switchHrStageView('post_job')">
+            <div class="stage-step-num">Stage 1</div>
+            <div class="stage-node-title">📝 Post Job</div>
+            <div class="stage-node-sub">AI Criteria Extraction</div>
+            <span id="stageBadgePostJob" class="stage-count-pill">Job Setup</span>
+          </div>
+
+          <div class="stage-connector-arrow">➔</div>
+
+          <!-- Stage 2 Node: Smart Screening -->
+          <div id="stageNodeScreening" class="stage-node-card" onclick="switchHrStageView('screening')">
+            <div class="stage-step-num">Stage 2</div>
+            <div class="stage-node-title">📄 Smart Screening</div>
+            <div class="stage-node-sub">AI Match &amp; Analytics</div>
+            <span id="stageBadgeScreening" class="stage-count-pill">0 Candidates</span>
+          </div>
+
+          <div class="stage-connector-arrow">➔</div>
+
+          <!-- Stage 3 Node: AI Interview -->
+          <div id="stageNodeAi" class="stage-node-card" onclick="switchHrStageView('ai_interview')">
+            <div class="stage-step-num">Stage 3</div>
+            <div class="stage-node-title">🤖 AI Interview</div>
+            <div class="stage-node-sub">Videos &amp; AI Metrics</div>
+            <span id="stageBadgeAi" class="stage-count-pill">0 Invited / Completed</span>
+          </div>
+
+          <div class="stage-connector-arrow">➔</div>
+
+          <!-- Stage 4 Node: Physical Interview -->
+          <div id="stageNodePhysical" class="stage-node-card" onclick="switchHrStageView('physical_interview')">
+            <div class="stage-step-num">Stage 4</div>
+            <div class="stage-node-title">🏢 Physical Interview</div>
+            <div class="stage-node-sub">On-Site &amp; Architecture</div>
+            <span id="stageBadgePhysical" class="stage-count-pill">0 Scheduled</span>
+          </div>
+
+          <div class="stage-connector-arrow">➔</div>
+
+          <!-- Stage 5 Node: Selection -->
+          <div id="stageNodeSelection" class="stage-node-card" onclick="switchHrStageView('selection')">
+            <div class="stage-step-num">Stage 5</div>
+            <div class="stage-node-title">💼 Selection &amp; Offer</div>
+            <div class="stage-node-sub">Hired Roster</div>
+            <span id="stageBadgeSelection" class="stage-count-pill">0 Selected</span>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ════ STAGE 1 VIEW: POST JOB & REQUIREMENTS ════ -->
+      <div id="stagePostJobView" class="stage-content-view">
         <div class="glass-panel">
-          <div class="panel-title">📝 Post Job &amp; Extract Requirements via AI</div>
+          <div class="panel-title">📝 Stage 1: Post Job Position &amp; Auto-Extract Criteria via AI</div>
           <p style="color:var(--text-500); font-size:0.85rem; margin-bottom:20px; line-height:1.6;">
-            Paste your job description below. The AI will extract key skills, required experience, qualifications, and
-            scoring weights — then immediately rank your entire candidate pool.
+            Paste your job description below. The AI will extract key skills, required experience, and scoring weights — then automatically advance to <strong>Stage 2 (Smart Screening)</strong>.
           </p>
 
-          <div class="grid-2">
-            <div class="form-group">
-              <label>Job Title *</label>
-              <input type="text" id="customJdTitle" class="form-control"
-                placeholder="e.g. Senior Python Backend Engineer">
-            </div>
-            <div class="form-group">
-              <label>Department</label>
-              <input type="text" id="customJdDept" class="form-control" placeholder="e.g. Engineering">
-            </div>
+          <div class="form-group">
+            <label>Job Title *</label>
+            <input type="text" id="customJdTitle" class="form-control"
+              placeholder="e.g. Senior Python Backend Engineer">
           </div>
 
           <div class="form-group">
             <label>Full Job Description *</label>
             <textarea id="customJdDesc" class="form-control" rows="8"
-              placeholder="Paste the full job posting here — responsibilities, required skills, qualifications, years of experience, education level..."></textarea>
+              placeholder="Paste the full job posting here — responsibilities, required skills, qualifications, experience..."></textarea>
           </div>
 
-          <div class="grid-3">
-            <div class="form-group">
-              <label>Target Interview Count</label>
-              <input type="number" id="customJdTargetCount" class="form-control" value="3" min="1" max="20">
-            </div>
-            <div class="form-group">
-              <label>Salary Min ($/yr)</label>
-              <input type="number" id="customJdSalMin" class="form-control" value="120000" step="5000">
-            </div>
-            <div class="form-group">
-              <label>Salary Max ($/yr)</label>
-              <input type="number" id="customJdSalMax" class="form-control" value="160000" step="5000">
-            </div>
-          </div>
-
-          <div style="display:flex; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
-            <button class="btn-primary" style="padding:11px 24px;" onclick="autoExtractJobDetailsWithLLM()">
-              🤖 Publish &amp; Auto-Extract with AI
+          <div style="display:flex; align-items:center; gap:14px; margin-top:12px; flex-wrap:wrap;">
+            <button class="btn-primary" style="padding:11px 24px; background:linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); font-weight:800;" onclick="autoExtractJobDetailsWithLLM()">
+              🤖 Publish &amp; Advance to Stage 2 (Smart Screening) ➔
             </button>
             <span id="aiPublishStatus" style="font-size:0.85rem; color:var(--cyan); font-weight:600;"></span>
           </div>
@@ -106,7 +140,7 @@
               <div>
                 <div style="font-weight:700; color:var(--text-100); font-size:0.95rem;">AI-Extracted Job Requirements
                 </div>
-                <div style="color:var(--text-500); font-size:0.8rem;">Review before candidates are ranked</div>
+                <div style="color:var(--text-500); font-size:0.8rem;">Review criteria before candidate screening</div>
               </div>
             </div>
             <div id="extractedCriteriaContent"></div>
@@ -114,22 +148,23 @@
         </div>
       </div>
 
-      <!-- HR Tab 2: Rank & Analytics -->
-      <div id="hrApplicantsTab" class="tab-content">
 
+      <!-- ════ STAGE 2 VIEW: SMART SCREENING STAGE (Resume Matching Analytics) ════ -->
+      <div id="stageScreeningView" class="stage-content-view" style="display:none;">
+        
         <!-- Job Selector Card -->
         <div class="glass-panel" style="margin-bottom:16px;">
           <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
             <div style="flex:1; min-width:200px;">
               <div
                 style="font-size:0.75rem;font-weight:600;color:var(--text-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
-                Select Job Opening</div>
+                Active Pipeline Opening</div>
               <select id="jobSelect" class="job-selector" style="margin-bottom:0;"
                 onchange="loadSelectedJobApplicants()">
                 <option value="">— Select a job position —</option>
               </select>
             </div>
-            <button class="btn-primary" onclick="loadSelectedJobApplicants()">📊 Load Rankings</button>
+            <button class="btn-primary" onclick="loadSelectedJobApplicants()">📊 Refresh Pipeline</button>
           </div>
 
           <!-- Job Detail Strip (hidden until selected) -->
@@ -137,7 +172,6 @@
             style="display:none; margin-top:16px; padding:14px; background:rgba(8,14,30,0.5); border-radius:10px; border:1px solid var(--border);">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
               <h3 id="jdTitle" style="color:#fff; font-size:1rem; font-weight:700;"></h3>
-              <span id="jdSalaryBadge" class="salary-badge"></span>
             </div>
             <p id="jdDesc"
               style="color:var(--text-500); font-size:0.82rem; margin:8px 0; line-height:1.5; max-height:48px; overflow:hidden;">
@@ -145,12 +179,6 @@
             <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:0.8rem; margin-top:4px;">
               <span style="color:var(--text-500);">Skills: <strong style="color:var(--text-300);"
                   id="jdSkillsList"></strong></span>
-              <span style="color:var(--text-500);">Target: <strong style="color:var(--cyan);"
-                  id="jdTargetCountBadge"></strong></span>
-              <span style="color:var(--text-500);">Availability: <strong style="color:var(--amber);"
-                  id="jdAvailBadge"></strong></span>
-              <span style="color:var(--text-500);">Nationality: <strong style="color:var(--emerald);"
-                  id="jdNatBadge"></strong></span>
             </div>
           </div>
         </div>
@@ -160,10 +188,6 @@
           <div class="kpi-card">
             <div class="kpi-label">Total Ranked</div>
             <div id="kpiTotalApps" class="kpi-value">0</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Interview Target</div>
-            <div id="kpiTargetCount" class="kpi-value">0</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">Shortlisted</div>
@@ -179,17 +203,11 @@
           </div>
         </div>
 
-        <!-- Skills chart for top candidates -->
-        <div id="visualAnalyticsPanel" class="glass-panel" style="display:none; margin-bottom:16px;">
-          <div class="panel-title">📊 Top Candidates — Score Comparison</div>
-          <div id="chartContainer"></div>
-        </div>
-
         <!-- Ranking Mode Toggle + Leaderboard -->
         <div class="glass-panel">
           <div
             style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-            <div class="panel-title" style="margin-bottom:0;">🏆 Candidate Ranking</div>
+            <div class="panel-title" style="margin-bottom:0;">🏆 Candidate Smart Screening Leaderboard</div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-size:0.78rem; color:var(--text-500); font-weight:600;">Scope:</span>
               <button id="rankModePoolBtn" class="btn-primary" style="font-size:0.78rem;padding:5px 13px;"
@@ -207,19 +225,81 @@
         </div>
       </div>
 
-      <!-- HR Tab 3: Candidate Pool -->
-      <div id="hrRepositoryTab" class="tab-content">
+      <!-- ════ STAGE 3 VIEW: AI VOICE INTERVIEW (Candidate Video & AI Metrics) ════ -->
+      <div id="stageAiInterviewView" class="stage-content-view" style="display:none;">
         <div class="glass-panel">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
-            <div class="panel-title" style="margin-bottom:0;">📁 Candidate Pool</div>
-            <div style="display:flex; gap:8px;">
-              <button class="btn-secondary" onclick="syncCandidatePool()">🔄 Sync Pool Folder</button>
-              <button class="btn-secondary" style="border-color:rgba(244,63,94,0.3); color:#fca5a5;" onclick="clearCandidatePool()">🗑️ Purge Vector DB</button>
+            <div>
+              <div class="panel-title" style="margin-bottom:2px;">🤖 Stage 3: AI Voice Agent Interviews &amp; Video Submissions</div>
+              <p style="color:var(--text-500); font-size:0.83rem; margin:0;">
+                Watch candidate recorded interview videos, review cheating risk scores, and inspect AI voice capability metrics.
+              </p>
             </div>
+            <button class="btn-secondary" onclick="loadHRCompletedInterviews()" style="font-size:0.78rem; padding:6px 12px;">🔄 Refresh Submissions</button>
           </div>
-          <div id="candidatesListTable">
-            <div style="color:var(--text-500); text-align:center; padding:30px;">Loading candidates...</div>
+          
+          <div id="stageAiCompletedContainer">
+            <div style="color:var(--text-500); text-align:center; padding:30px;">Loading candidate interview submissions...</div>
           </div>
+        </div>
+      </div>
+
+      <!-- ════ STAGE 4 VIEW: PHYSICAL INTERVIEW (On-Site Scheduling & Feedback) ════ -->
+      <div id="stagePhysicalInterviewView" class="stage-content-view" style="display:none;">
+        <div class="glass-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div class="panel-title" style="margin-bottom:2px;">🏢 Stage 4: Physical &amp; On-Site Interview Management</div>
+              <p style="color:var(--text-500); font-size:0.83rem; margin:0;">
+                Schedule and manage candidates who have passed AI Voice Interview and advanced to physical on-site interviews.
+              </p>
+            </div>
+            <button class="btn-secondary" onclick="loadPhysicalInterviewsView()" style="font-size:0.78rem; padding:6px 12px;">🔄 Refresh Schedule</button>
+          </div>
+
+          <div id="stagePhysicalContainer">
+            <div style="color:var(--text-500); text-align:center; padding:30px;">Loading physical interview schedules...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ STAGE 5 VIEW: SELECTION & OFFER (Selected Candidates) ════ -->
+      <div id="stageSelectionView" class="stage-content-view" style="display:none;">
+        <div class="glass-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div class="panel-title" style="margin-bottom:2px;">💼 Stage 5: Hired Candidates &amp; Salary Offers</div>
+              <p style="color:var(--text-500); font-size:0.83rem; margin:0;">
+                Final selected candidates who have successfully completed all recruitment stages.
+              </p>
+            </div>
+            <button class="btn-secondary" onclick="loadSelectionView()" style="font-size:0.78rem; padding:6px 12px;">🔄 Refresh Roster</button>
+          </div>
+
+          <div id="stageSelectionContainer">
+            <div style="color:var(--text-500); text-align:center; padding:30px;">Loading selected candidates...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Candidate Pool Trigger Button & Hidden Container -->
+      <div style="margin-top:24px; display:flex; justify-content:center;">
+        <button id="toggleCandidatePoolBtn" class="btn-secondary" style="font-size:0.83rem; padding:10px 22px; font-weight:700; border-color:rgba(6,182,212,0.3); color:var(--cyan);" onclick="toggleCandidatePoolView()">
+          📁 View Candidate Pool Vector DB
+        </button>
+      </div>
+
+      <div id="hrRepositoryContainer" class="glass-panel" style="display:none; margin-top:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+          <div class="panel-title" style="margin-bottom:0;">📁 Candidate Pool (ChromaDB Vector Store)</div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-secondary" onclick="syncCandidatePool()">🔄 Sync Pool Folder</button>
+            <button class="btn-secondary" style="border-color:rgba(244,63,94,0.3); color:#fca5a5;" onclick="clearCandidatePool()">🗑️ Purge Vector DB</button>
+            <button class="btn-secondary" onclick="toggleCandidatePoolView()">✖️ Hide Pool</button>
+          </div>
+        </div>
+        <div id="candidatesListTable">
+          <div style="color:var(--text-500); text-align:center; padding:30px;">Loading candidates...</div>
         </div>
       </div>
     </div>
@@ -231,10 +311,30 @@
     <div id="seekerPortalView" class="portal-view">
 
       <nav class="sub-nav">
-        <button class="nav-btn active" onclick="switchSeekerTab('seekerUploadTab', this)">📄 Upload Resume</button>
+        <button class="nav-btn active" onclick="switchSeekerTab('seekerInboxTab', this)">📥 My Inbox &amp; Invitations</button>
+        <button class="nav-btn" onclick="switchSeekerTab('seekerUploadTab', this)">📄 Upload Resume</button>
         <button class="nav-btn" onclick="switchSeekerTab('seekerJobsTab', this)">💼 Browse Jobs</button>
         <button class="nav-btn" onclick="switchSeekerTab('seekerAppsTab', this)">📋 My Applications</button>
       </nav>
+
+      <!-- Candidate Inbox Tab (Default active tab) -->
+      <div id="seekerInboxTab" class="tab-content active">
+        <div class="glass-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <div>
+              <div class="panel-title" style="margin-bottom:2px;">📥 Candidate Inbox &amp; Voice Interview Invitations</div>
+              <p style="color:var(--text-500); font-size:0.83rem; margin:0;">
+                Logged in as <strong id="inboxUserEmail" style="color:var(--cyan);">candidate@gmail.com</strong>. Here are your incoming voice call interview invitations from HR.
+              </p>
+            </div>
+            <button class="btn-secondary" onclick="loadCandidateInbox()" style="font-size:0.78rem; padding:6px 12px;">🔄 Refresh Inbox</button>
+          </div>
+          
+          <div id="candidateInboxContainer">
+            <div style="color:var(--text-500); text-align:center; padding:30px;">Loading invitations...</div>
+          </div>
+        </div>
+      </div>
 
       <!-- Upload Tab -->
       <div id="seekerUploadTab" class="tab-content active">
@@ -363,12 +463,308 @@
       </div>
 
       <div
-        style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding-top:16px; border-top:1px solid var(--border);">
-        <button id="modalShortlistBtn" class="btn-primary" style="background:var(--grad-amber);">
-          ⭐ Shortlist for Interview
-        </button>
+        style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding-top:16px; border-top:1px solid var(--border); flex-wrap:wrap;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="modalInviteInterviewBtn" class="btn-primary" style="background:linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); font-weight:700;">
+            ✉️ Invite Candidate to Interview
+          </button>
+          <button id="modalProceedInterviewBtn" class="btn-primary" style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); font-weight:700;">
+            🎙️ Direct Voice Interview
+          </button>
+          <button id="modalShortlistBtn" class="btn-primary" style="background:var(--grad-amber);">
+            ⭐ Shortlist
+          </button>
+        </div>
         <button class="btn-secondary" onclick="closeModal()">Close</button>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════
+     AI VOICE INTERVIEW ROOM MODAL (Candidate + Camera Recording)
+══════════════════════════════════════════════ -->
+  <div id="interviewRoomModal" class="modal-overlay">
+    <div class="modal-body" style="max-width:980px; width:95vw; padding:24px; background: #0b1120;">
+      
+      <!-- Interview Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:14px; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="live-rec-badge">
+            <span class="rec-dot"></span> LIVE VOICE INTERVIEW
+          </div>
+          <div>
+            <h2 id="intCandidateTitle" style="color:#fff; font-size:1.15rem; font-weight:800; margin:0;">AI Voice Agent Call</h2>
+            <div id="intJobSubtitle" style="color:var(--text-500); font-size:0.8rem; margin-top:2px;">Target Position: Software Engineer</div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div id="interviewTimer" style="font-family:monospace; font-size:1rem; font-weight:700; color:var(--cyan); background:rgba(6,182,212,0.1); padding:4px 10px; border-radius:8px; border:1px solid rgba(6,182,212,0.2);">
+            00:00
+          </div>
+          <button class="btn-secondary" onclick="cancelVoiceInterview()" style="padding:6px 12px; font-size:0.8rem; border-color:#f43f5e; color:#fca5a5;">End Call ✕</button>
+        </div>
+      </div>
+
+      <!-- Interview Main Grid (Left: Camera Video Stream, Right: Voice Agent Interaction) -->
+      <div class="grid-2" style="grid-template-columns: 1fr 1fr; gap:20px;">
+        
+        <!-- Left: Candidate Camera & Anti-Cheating Monitor -->
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--border); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.8rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:6px;">
+              📷 Candidate Webcam Stream
+            </span>
+            <span id="cheatingStatusBadge" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:8px;">
+              🛡️ Anti-Cheating Active
+            </span>
+          </div>
+
+          <!-- Video Container -->
+          <div style="position:relative; width:100%; aspect-ratio:4/3; background:#000; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+            <video id="interviewCameraFeed" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+            
+            <div style="position:absolute; top:10px; left:10px; background:rgba(244,63,94,0.85); color:#fff; font-size:0.7rem; font-weight:800; padding:3px 8px; border-radius:6px; backdrop-filter:blur(4px); display:flex; align-items:center; gap:5px;">
+              <span class="rec-dot" style="background:#fff;"></span> REC
+            </div>
+
+            <div id="cameraPromptOverlay" style="position:absolute; inset:0; background:rgba(15,23,42,0.9); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+              <div style="font-size:2rem; margin-bottom:8px;">📷</div>
+              <div style="font-weight:700; color:#fff; margin-bottom:4px; font-size:0.9rem;">Camera Access Required</div>
+              <div style="color:var(--text-500); font-size:0.78rem; margin-bottom:14px;">Candidate video must be recorded for HR review & anti-cheating verification.</div>
+              <button class="btn-primary" onclick="requestCameraAccess()" style="padding:7px 16px; font-size:0.8rem;">Allow Webcam & Mic</button>
+            </div>
+          </div>
+
+          <!-- Cheating Monitor Live Feed -->
+          <div style="background:rgba(8,14,30,0.6); padding:10px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.76rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:var(--text-500);">Tab Focus Status:</span>
+              <span id="tabFocusStatus" style="color:#6ee7b7; font-weight:700;">Focused ✓</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-500);">Cheating Flag Count:</span>
+              <span id="liveCheatingFlags" style="color:var(--cyan); font-weight:700;">0 Anomaly Flags</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: AI Voice Call Agent Interface -->
+        <div style="background:rgba(15,23,42,0.8); border:1px solid var(--border); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px;">
+          
+          <!-- Agent Avatar & Waveform -->
+          <div style="display:flex; align-items:center; gap:14px; background:rgba(8,14,30,0.7); padding:12px 16px; border-radius:12px; border:1px solid var(--border);">
+            <div class="agent-avatar-glow">
+              🤖
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:800; color:#fff; font-size:0.95rem;">AI Interview Agent</div>
+              <div id="agentStatusText" style="color:var(--cyan); font-size:0.76rem; font-weight:600;">Speaking question...</div>
+            </div>
+            <div class="voice-wave-container" id="voiceWaveform">
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+              <span class="wave-bar"></span>
+            </div>
+          </div>
+
+          <!-- Stage Progress -->
+          <div style="display:flex; gap:6px;">
+            <div id="stageStep1" class="stage-step active">1. Experience</div>
+            <div id="stageStep2" class="stage-step">2. Capability Test</div>
+            <div id="stageStep3" class="stage-step">3. Candidate Q&amp;A</div>
+          </div>
+
+          <!-- Live Transcript Box -->
+          <div id="interviewTranscriptBox" style="flex:1; min-height:180px; max-height:220px; overflow-y:auto; background:rgba(8,14,30,0.9); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:10px; font-size:0.83rem;">
+            <div style="color:var(--text-500); text-align:center; padding-top:40px;">Initializing voice session...</div>
+          </div>
+
+          <!-- Voice Mic & Speech Input Controls -->
+          <div style="display:flex; align-items:center; gap:10px; background:rgba(8,14,30,0.5); padding:10px; border-radius:10px; border:1px solid var(--border);">
+            <button id="micToggleBtn" class="mic-btn" onclick="toggleVoiceRecording()">
+              🎙️ Speak
+            </button>
+            <input type="text" id="manualSpeechInput" class="form-control" placeholder="Or type candidate response here..." style="flex:1; font-size:0.82rem; padding:8px 12px;">
+            <button class="btn-primary" onclick="sendCandidateVoiceTurn()" style="padding:8px 14px; font-size:0.8rem;">Send ➔</button>
+          </div>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-500);">
+            <span>Voice output is enabled (AI speaks automatically)</span>
+            <button class="btn-primary" style="background:var(--grad-emerald); font-size:0.75rem; padding:5px 12px;" onclick="finishAndEvaluateInterview()">
+              ✅ Submit &amp; Evaluate Interview
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════
+     HR INTERVIEW REPORT & CHEATING ANALYSIS MODAL
+══════════════════════════════════════════════ -->
+  <div id="interviewReportModal" class="modal-overlay">
+    <div class="modal-body" style="max-width:880px; width:92vw;">
+      <button class="modal-close" onclick="closeInterviewReportModal()">✕</button>
+
+      <div style="margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 id="reportCandidateName" style="color:#fff; font-size:1.25rem; font-weight:800; margin:0;">Candidate Voice Interview Report</h2>
+            <div id="reportJobTitle" style="color:var(--text-500); font-size:0.83rem; margin-top:2px;">Software Engineer Position</div>
+          </div>
+          <span id="reportRiskBadge" class="rec-banner highly-recommended" style="padding:5px 12px; font-size:0.8rem;">
+            🛡️ Low Cheating Risk
+          </span>
+        </div>
+      </div>
+
+      <div class="grid-2" style="grid-template-columns: 1.1fr 0.9fr; gap:18px; margin-bottom:18px;">
+        
+        <!-- Left: Recorded Video Player -->
+        <div style="background:rgba(15,23,42,0.8); padding:14px; border-radius:12px; border:1px solid var(--border);">
+          <div style="font-size:0.82rem; font-weight:700; color:#fff; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+            <span>📹 Recorded Interview Video</span>
+            <span style="color:var(--cyan); font-size:0.75rem;">Recorded for HR View</span>
+          </div>
+          
+          <div style="width:100%; aspect-ratio:4/3; background:#000; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+            <video id="hrReportVideoPlayer" controls style="width:100%; height:100%; object-fit:cover;"></video>
+          </div>
+          <div id="videoNoStreamMsg" style="display:none; color:var(--text-500); text-align:center; padding:30px; font-size:0.8rem;">
+            No video recording file found for this session.
+          </div>
+        </div>
+
+        <!-- Right: Cheating Analysis & Anti-Cheating Metrics -->
+        <div style="background:rgba(15,23,42,0.8); padding:14px; border-radius:12px; border:1px solid var(--border); display:flex; flex-direction:column; gap:12px;">
+          <div style="font-size:0.82rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:6px;">
+            🛡️ Anti-Cheating Analysis Report
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+            <div style="background:rgba(8,14,30,0.6); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+              <div style="font-size:0.72rem; color:var(--text-500);">Cheating Risk Score</div>
+              <div id="reportRiskScoreVal" style="font-size:1.2rem; font-weight:800; color:#6ee7b7; margin-top:2px;">5%</div>
+            </div>
+            <div style="background:rgba(8,14,30,0.6); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+              <div style="font-size:0.72rem; color:var(--text-500);">Tab Switch Count</div>
+              <div id="reportTabSwitchVal" style="font-size:1.2rem; font-weight:800; color:var(--cyan); margin-top:2px;">0</div>
+            </div>
+          </div>
+
+          <div style="background:rgba(8,14,30,0.6); padding:10px 12px; border-radius:8px; border:1px solid var(--border);">
+            <div style="font-size:0.74rem; font-weight:700; color:var(--text-500); margin-bottom:4px;">Detection Summary:</div>
+            <p id="reportCheatingSummary" style="font-size:0.78rem; color:var(--text-300); margin:0; line-height:1.5;"></p>
+          </div>
+
+          <div style="background:rgba(8,14,30,0.6); padding:10px 12px; border-radius:8px; border:1px solid var(--border);">
+            <div style="font-size:0.74rem; font-weight:700; color:var(--text-500); margin-bottom:4px;">Flagged Anomalies:</div>
+            <ul id="reportCheatingFlagsList" style="margin:0; padding-left:14px; font-size:0.76rem; color:#fca5a5;"></ul>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Voice Data & Capability Evaluation -->
+      <div style="background:rgba(15,23,42,0.8); padding:16px; border-radius:12px; border:1px solid var(--border); margin-bottom:16px;">
+        <div style="font-size:0.88rem; font-weight:800; color:#fff; margin-bottom:12px;">
+          🗣️ AI Voice &amp; Performance Assessment
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:14px;">
+          <div style="background:rgba(8,14,30,0.6); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+            <div style="font-size:0.72rem; color:var(--text-500);">Communication Score</div>
+            <div id="reportCommScore" style="font-size:1.25rem; font-weight:800; color:#6ee7b7; margin-top:2px;">88%</div>
+          </div>
+          <div style="background:rgba(8,14,30,0.6); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+            <div style="font-size:0.72rem; color:var(--text-500);">Technical Depth Score</div>
+            <div id="reportTechScore" style="font-size:1.25rem; font-weight:800; color:var(--cyan); margin-top:2px;">85%</div>
+          </div>
+          <div style="background:rgba(8,14,30,0.6); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+            <div style="font-size:0.72rem; color:var(--text-500);">Confidence Rating</div>
+            <div id="reportConfidence" style="font-size:0.9rem; font-weight:800; color:#fde68a; margin-top:6px;">High Confidence</div>
+          </div>
+        </div>
+
+        <div style="background:rgba(8,14,30,0.6); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.83rem; line-height:1.6; color:var(--text-300);" id="reportVoiceRationale">
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="btn-secondary" onclick="closeInterviewReportModal()">Close Report</button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════
+     AUTHENTICATION / SIGN IN SELECTION MODAL
+══════════════════════════════════════════════ -->
+  <div id="authLoginModal" class="modal-overlay">
+    <div class="modal-container" style="max-width:620px; padding:28px;">
+      <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-size:2.5rem; margin-bottom:6px;">⚡</div>
+        <h2 style="color:#fff; font-weight:900; font-size:1.4rem; margin:0;">HiringAid@10x Sign In</h2>
+        <p style="color:var(--text-500); font-size:0.88rem; margin-top:6px;">
+          Select your portal account to sign in:
+        </p>
+      </div>
+
+      <!-- Quick Login Selection Cards -->
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:20px;">
+        
+        <!-- HR Manager Card -->
+        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(6,182,212,0.4); border-radius:14px; padding:20px; display:flex; flex-direction:column; justify-content:space-between; gap:14px; text-align:center;">
+          <div>
+            <div style="font-size:2rem; margin-bottom:8px;">💼</div>
+            <h3 style="color:#fff; font-size:1.1rem; font-weight:800; margin:0;">HR Manager Portal</h3>
+            <div style="color:var(--cyan); font-size:0.8rem; font-weight:700; margin-top:2px;">hr@db.com</div>
+            <p style="color:var(--text-500); font-size:0.76rem; margin-top:8px; line-height:1.4;">
+              Post jobs, extract AI requirements, rank candidates, review recorded interview videos &amp; cheating analysis reports.
+            </p>
+          </div>
+          <button class="btn-primary" style="width:100%; padding:10px; font-size:0.85rem; font-weight:800; background:linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);" onclick="performAuthLogin('hr@db.com', 'hr')">
+            Sign In as HR (hr@db.com) ➔
+          </button>
+        </div>
+
+        <!-- Candidate Card -->
+        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(99,102,241,0.4); border-radius:14px; padding:20px; display:flex; flex-direction:column; justify-content:space-between; gap:14px; text-align:center;">
+          <div>
+            <div style="font-size:2rem; margin-bottom:8px;">👤</div>
+            <h3 style="color:#fff; font-size:1.1rem; font-weight:800; margin:0;">Candidate Home</h3>
+            <div style="color:var(--purple); font-size:0.8rem; font-weight:700; margin-top:2px;">candidate@gmail.com</div>
+            <p style="color:var(--text-500); font-size:0.76rem; margin-top:8px; line-height:1.4;">
+              Receive HR invitations, start AI voice call interview with webcam recording, upload resume &amp; track applications.
+            </p>
+          </div>
+          <button class="btn-primary" style="width:100%; padding:10px; font-size:0.85rem; font-weight:800; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);" onclick="performAuthLogin('candidate@gmail.com', 'candidate')">
+            Sign In as Candidate (candidate@gmail.com) ➔
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Custom Email Login Box -->
+      <div style="background:rgba(8,14,30,0.6); padding:14px 18px; border-radius:12px; border:1px solid var(--border);">
+        <div style="font-size:0.78rem; font-weight:700; color:var(--text-300); margin-bottom:8px;">Custom Account Sign In:</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <input type="email" id="customLoginEmail" class="form-control" placeholder="e.g. candidate@gmail.com" style="flex:1; min-width:180px; font-size:0.83rem;">
+          <select id="customLoginRole" class="form-control" style="width:130px; font-size:0.83rem;">
+            <option value="candidate">Candidate</option>
+            <option value="hr">HR Manager</option>
+          </select>
+          <button class="btn-secondary" style="font-size:0.8rem; padding:8px 14px;" onclick="performCustomLogin()">Sign In ➔</button>
+        </div>
+      </div>
+
     </div>
   </div>
 

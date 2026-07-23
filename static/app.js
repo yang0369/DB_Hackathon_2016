@@ -7,27 +7,154 @@ let currentRankingMode = "pool"; // "pool" = all candidates, "applicants" = appl
 let activeCandidate = null; // Stored candidate profile for active job seeker
 let userApplications = [];
 
+let currentUser = null;
+
 document.addEventListener("DOMContentLoaded", () => {
-  fetchSampleJobs();
-  loadCandidatesList();
   setupDragAndDrop();
-  loadSeekerJobs();
+  checkAuthSessionOnLoad();
 });
 
 function openApiKeyModal() {}
 function closeApiKeyModal() {}
 async function saveApiKey() {}
 
+function checkAuthSessionOnLoad() {
+  const saved = sessionStorage.getItem("hiringaid_auth_user");
+  if (saved) {
+    try {
+      const user = JSON.parse(saved);
+      if (user && user.email && user.role) {
+        performAuthLogin(user.email, user.role);
+        return;
+      }
+    } catch (e) {}
+  }
+
+  // If no authenticated session, lock portals & prompt login
+  lockAllPortalsAndShowLogin();
+}
+
+function lockAllPortalsAndShowLogin() {
+  currentUser = null;
+  sessionStorage.removeItem("hiringaid_auth_user");
+
+  const hrView = document.getElementById("hrPortalView");
+  const seekerView = document.getElementById("seekerPortalView");
+  if (hrView) hrView.classList.remove("active");
+  if (seekerView) seekerView.classList.remove("active");
+
+  const activeDisplay = document.getElementById("activeUserDisplay");
+  if (activeDisplay) {
+    activeDisplay.innerText = "🔒 Not Logged In";
+    activeDisplay.style.color = "var(--amber)";
+  }
+
+  const signInBtn = document.getElementById("headerSignInBtn");
+  const logoutBtn = document.getElementById("headerLogoutBtn");
+  if (signInBtn) signInBtn.style.display = "inline-block";
+  if (logoutBtn) logoutBtn.style.display = "none";
+
+  openAuthModal();
+}
+
+function logoutUser() {
+  lockAllPortalsAndShowLogin();
+}
+
+function openAuthModal() {
+  const modal = document.getElementById("authLoginModal");
+  if (modal) modal.classList.add("active");
+}
+
+function closeAuthModal() {
+  // Only allow closing if logged in
+  if (!currentUser) return;
+  const modal = document.getElementById("authLoginModal");
+  if (modal) modal.classList.remove("active");
+}
+
+async function performAuthLogin(email, role) {
+  await loginUserAccount(email, role);
+  
+  const modal = document.getElementById("authLoginModal");
+  if (modal) modal.classList.remove("active");
+
+  const signInBtn = document.getElementById("headerSignInBtn");
+  const logoutBtn = document.getElementById("headerLogoutBtn");
+  if (signInBtn) signInBtn.style.display = "none";
+  if (logoutBtn) logoutBtn.style.display = "inline-block";
+
+  if (role === 'hr') {
+    switchHrStageView('post_job');
+  } else {
+    switchSeekerTab('seekerInboxTab', document.querySelector("#seekerPortalView .nav-btn"));
+    loadCandidateInbox();
+  }
+}
+
+function performCustomLogin() {
+  const emailInput = document.getElementById("customLoginEmail");
+  const roleSelect = document.getElementById("customLoginRole");
+  const email = emailInput ? emailInput.value.trim() : "candidate@gmail.com";
+  const role = roleSelect ? roleSelect.value : "candidate";
+
+  if (!email) {
+    alert("Please enter a valid email address.");
+    return;
+  }
+
+  performAuthLogin(email, role);
+}
+
+async function loginUserAccount(email, role) {
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, role: role })
+    });
+    if (res.ok) {
+      currentUser = await res.json();
+    } else {
+      currentUser = { email: email, name: role === 'hr' ? 'HR Manager' : 'Candidate', role: role };
+    }
+  } catch(e) {
+    currentUser = { email: email, name: role === 'hr' ? 'HR Manager' : 'Candidate', role: role };
+  }
+
+  sessionStorage.setItem("hiringaid_auth_user", JSON.stringify(currentUser));
+
+  const activeDisplay = document.getElementById("activeUserDisplay");
+  if (activeDisplay) {
+    activeDisplay.innerText = currentUser.email;
+    activeDisplay.style.color = "var(--cyan)";
+  }
+  
+  const seekerNav = role === 'candidate' || role === 'seeker' ? 'seeker' : 'hr';
+  switchPortalRole(seekerNav);
+
+  if (seekerNav === 'seeker') {
+    const inboxEmailEl = document.getElementById("inboxUserEmail");
+    if (inboxEmailEl) inboxEmailEl.innerText = currentUser.email;
+    loadCandidateInbox();
+  }
+}
 
 function switchPortalRole(role) {
   currentRole = role;
-  document.getElementById("roleHrBtn").classList.toggle("active", role === 'hr');
-  document.getElementById("roleSeekerBtn").classList.toggle("active", role === 'seeker');
+  const isHr = role === 'hr';
+  const hrBtn = document.getElementById("roleHrBtn");
+  const seekerBtn = document.getElementById("roleSeekerBtn");
+  if (hrBtn) hrBtn.classList.toggle("active", isHr);
+  if (seekerBtn) seekerBtn.classList.toggle("active", !isHr);
 
-  document.getElementById("hrPortalView").classList.toggle("active", role === 'hr');
-  document.getElementById("seekerPortalView").classList.toggle("active", role === 'seeker');
+  const hrView = document.getElementById("hrPortalView");
+  const seekerView = document.getElementById("seekerPortalView");
+  if (hrView) hrView.classList.toggle("active", isHr);
+  if (seekerView) seekerView.classList.toggle("active", !isHr);
 
-  if (role === 'seeker') {
+  if (!isHr) {
+    loadCandidateInbox();
     loadSeekerJobs();
     loadSeekerApplications();
   } else {
@@ -45,6 +172,8 @@ function switchHrTab(tabId, btnElement) {
 
   if (tabId === "hrRepositoryTab") {
     loadCandidatesList();
+  } else if (tabId === "hrInterviewsTab") {
+    loadHRCompletedInterviews();
   } else if (tabId === "hrApplicantsTab") {
     fetchSampleJobs().then(() => {
       const select = document.getElementById("jobSelect");
@@ -397,7 +526,7 @@ async function autoExtractJobDetailsWithLLM() {
   const title = document.getElementById("customJdTitle").value.trim() || "Target Job Position";
   const dept = document.getElementById("customJdDept") ? document.getElementById("customJdDept").value.trim() : "Engineering";
   const desc = document.getElementById("customJdDesc") ? document.getElementById("customJdDesc").value.trim() : "";
-  const targetCount = parseInt(document.getElementById("customJdTargetCount").value) || 3;
+  const targetCount = document.getElementById("customJdTargetCount") ? (parseInt(document.getElementById("customJdTargetCount").value) || 3) : 3;
   const salMin = parseFloat(document.getElementById("customJdSalMin").value) || 120000;
   const salMax = parseFloat(document.getElementById("customJdSalMax").value) || 160000;
   const statusSpan = document.getElementById("aiPublishStatus");
@@ -442,13 +571,14 @@ async function autoExtractJobDetailsWithLLM() {
 
     if (statusSpan) statusSpan.innerText = `✅ Extracted ${selectedJob.required_skills.length} key skills — see criteria preview below!`;
 
-    // Wait 2s so HR can read the preview, then navigate to ranking
+    // Wait 1.5s so HR can read the preview, then advance to Stage 2 (Screening)
     setTimeout(() => {
       currentMatchResults = [];
-      switchHrTab('hrApplicantsTab', document.querySelectorAll("#hrPortalView .nav-btn")[1]);
-      document.getElementById("jobSelect").value = selectedJob.id;
+      switchHrStageView('screening');
+      const select = document.getElementById("jobSelect");
+      if (select) select.value = selectedJob.id;
       loadSelectedJobApplicants();
-    }, 2500);
+    }, 1500);
 
   } catch (err) {
     if (statusSpan) statusSpan.innerText = `❌ Error: ${err.message}`;
@@ -596,16 +726,15 @@ async function loadSelectedJobApplicants() {
   }
 
   card.style.display = "block";
-  document.getElementById("jdTitle").innerText = selectedJob.title;
-  document.getElementById("jdDesc").innerText = selectedJob.description;
-  document.getElementById("jdSkillsList").innerText = (selectedJob.required_skills || []).join(", ");
-  document.getElementById("jdTargetCountBadge").innerText = `${selectedJob.target_candidate_count || 3} Candidates`;
-  document.getElementById("jdAvailBadge").innerText = selectedJob.required_availability || "Any";
-  document.getElementById("jdNatBadge").innerText = selectedJob.required_nationality || "Any";
+  const elTitle = document.getElementById("jdTitle");
+  const elDesc = document.getElementById("jdDesc");
+  const elSkills = document.getElementById("jdSkillsList");
+  const elTarget = document.getElementById("jdTargetCountBadge");
 
-  const salMin = selectedJob.salary_min ? `$${selectedJob.salary_min.toLocaleString()}` : '';
-  const salMax = selectedJob.salary_max ? `$${selectedJob.salary_max.toLocaleString()}` : '';
-  document.getElementById("jdSalaryBadge").innerText = (salMin && salMax) ? `💵 Salary: ${salMin} - ${salMax} / yr` : '💵 Competitive Salary';
+  if (elTitle) elTitle.innerText = selectedJob.title;
+  if (elDesc) elDesc.innerText = selectedJob.description;
+  if (elSkills) elSkills.innerText = (selectedJob.required_skills || []).join(", ");
+  if (elTarget) elTarget.innerText = `${selectedJob.target_candidate_count || 3} Candidates`;
 
   const modeLabel = currentRankingMode === 'pool' ? 'all pool candidates' : 'applicants only';
   container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">⚡ Ranking ${modeLabel} against job requirements...</p>`;
@@ -636,6 +765,7 @@ async function loadSelectedJobApplicants() {
     currentMatchResults = fetchedResults;
     renderAnalyticsDashboard(currentMatchResults);
     renderLeaderboard(currentMatchResults);
+    updatePipelineStageCounts();
   } catch (err) {
     container.innerHTML = `<p style="color: #fca5a5; text-align: center;">❌ Error evaluating candidates: ${err.message}</p>`;
   }
@@ -644,19 +774,18 @@ async function loadSelectedJobApplicants() {
 function renderAnalyticsDashboard(matches) {
   const kpiContainer = document.getElementById("analyticsKpiContainer");
   const visualPanel = document.getElementById("visualAnalyticsPanel");
-  const chartContainer = document.getElementById("chartContainer");
 
   if (!matches || matches.length === 0) {
-    kpiContainer.style.display = "none";
-    visualPanel.style.display = "none";
+    if (kpiContainer) kpiContainer.style.display = "none";
+    if (visualPanel) visualPanel.style.display = "none";
     return;
   }
 
-  kpiContainer.style.display = "grid";
-  visualPanel.style.display = "block";
+  if (kpiContainer) kpiContainer.style.display = "grid";
+  if (visualPanel) visualPanel.style.display = "none";
 
   const totalApps = matches.length;
-  const targetX = selectedJob.target_candidate_count || 3;
+  const targetX = (selectedJob && selectedJob.target_candidate_count) ? selectedJob.target_candidate_count : 3;
   const shortlisted = matches.filter(m => m.selection_status === "Shortlisted for Interview" || m.selection_status === "Selected").length;
   const topMatches = matches.slice(0, targetX);
   const avgTopScore = topMatches.length > 0
@@ -664,36 +793,17 @@ function renderAnalyticsDashboard(matches) {
     : 0;
   const avgSkillIndex = Math.round(matches.reduce((acc, m) => acc + (m.weighted_skill_score || m.skill_coverage || 0), 0) / totalApps);
 
-  document.getElementById("kpiTotalApps").innerText = totalApps;
-  document.getElementById("kpiTargetCount").innerText = targetX;
-  document.getElementById("kpiShortlisted").innerText = shortlisted;
-  document.getElementById("kpiAvgTopScore").innerText = `${avgTopScore}%`;
-  document.getElementById("kpiSkillIndex").innerText = `${avgSkillIndex}%`;
+  const elTotal = document.getElementById("kpiTotalApps");
+  const elTarget = document.getElementById("kpiTargetCount");
+  const elShort = document.getElementById("kpiShortlisted");
+  const elAvg = document.getElementById("kpiAvgTopScore");
+  const elIndex = document.getElementById("kpiSkillIndex");
 
-  chartContainer.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      ${topMatches.map((m, i) => {
-        const score = Math.round(m.match_score);
-        const skillScore = Math.round(m.weighted_skill_score || m.skill_coverage || 0);
-        const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f43f5e';
-        return `
-          <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(8,14,30,0.5); border-radius:10px; border:1px solid var(--border);">
-            <span style="font-size:0.72rem; font-weight:800; color:var(--text-500); width:18px; text-align:center;">#${i+1}</span>
-            <span style="font-weight:700; color:#fff; font-size:0.87rem; min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.candidate_name}</span>
-            <div style="flex:1; display:flex; align-items:center; gap:8px;">
-              <div style="flex:1; height:6px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden;">
-                <div style="height:100%; width:${score}%; background:${color}; border-radius:3px; transition:width 0.6s ease;"></div>
-              </div>
-              <span style="font-size:0.85rem; font-weight:800; color:${color}; min-width:38px; text-align:right;">${score}%</span>
-            </div>
-            <div style="display:flex; gap:6px; flex-shrink:0;">
-              ${(m.matched_skills || []).slice(0,3).map(s => `<span style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); color:#6ee7b7; padding:1px 7px; border-radius:10px; font-size:0.72rem;">${s}</span>`).join('')}
-            </div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
+  if (elTotal) elTotal.innerText = totalApps;
+  if (elTarget) elTarget.innerText = targetX;
+  if (elShort) elShort.innerText = shortlisted;
+  if (elAvg) elAvg.innerText = `${avgTopScore}%`;
+  if (elIndex) elIndex.innerText = `${avgSkillIndex}%`;
 }
 
 
@@ -785,9 +895,21 @@ function renderLeaderboard(matches) {
                   </span>
                 </td>
                 <td>
-                  <div style="display:flex; gap:5px; align-items:center;">
-                    <button class="btn-primary" onclick="openHRProposalModal('${m.candidate_id}')" style="font-size:0.72rem; padding:5px 10px;">Details</button>
-                    ${!isDisqualified ? `<button onclick="shortlistCandidate('${m.candidate_id}')" style="font-size:0.7rem; padding:4px 8px; border-radius:6px; background:rgba(245,158,11,0.1); color:#fde68a; border:1px solid rgba(245,158,11,0.25); cursor:pointer;">⭐</button>` : ''}
+                  <div style="display:flex; gap:5px; align-items:center; flex-wrap:nowrap;">
+                    <button class="btn-primary" onclick="openHRProposalModal('${m.candidate_id}')" style="font-size:0.72rem; padding:5px 9px;">Details</button>
+                    ${!isDisqualified ? `
+                      <button onclick="sendInterviewInvitation('${m.candidate_id}', '${selectedJob ? selectedJob.id : ''}')" style="font-size:0.72rem; padding:5px 9px; border-radius:6px; background:linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); color:#fff; border:none; cursor:pointer; font-weight:700; display:flex; align-items:center; gap:3px;">
+                        ✉️ Invite
+                      </button>
+                      <button onclick="startCandidateVoiceInterview('${m.candidate_id}', '${selectedJob ? selectedJob.id : ''}')" style="font-size:0.72rem; padding:5px 9px; border-radius:6px; background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color:#fff; border:none; cursor:pointer; font-weight:700; display:flex; align-items:center; gap:3px;">
+                        🎙️ Direct
+                      </button>
+                    ` : ''}
+                    ${m.selection_status === 'Interview Completed' ? `
+                      <button onclick="checkCandidateInterviewReport('${m.candidate_id}')" style="font-size:0.72rem; padding:5px 9px; border-radius:6px; background:rgba(6,182,212,0.15); color:var(--cyan); border:1px solid rgba(6,182,212,0.3); cursor:pointer; font-weight:700;">
+                        📹 Report
+                      </button>
+                    ` : ''}
                   </div>
                 </td>
               </tr>
@@ -893,6 +1015,22 @@ function openHRProposalModal(candidateId) {
 
   const btn = document.getElementById("modalShortlistBtn");
   btn.onclick = () => shortlistCandidate(match.candidate_id);
+
+  const inviteBtn = document.getElementById("modalInviteInterviewBtn");
+  if (inviteBtn) {
+    inviteBtn.onclick = () => {
+      closeModal();
+      sendInterviewInvitation(match.candidate_id, match.job_id);
+    };
+  }
+
+  const interviewBtn = document.getElementById("modalProceedInterviewBtn");
+  if (interviewBtn) {
+    interviewBtn.onclick = () => {
+      closeModal();
+      startCandidateVoiceInterview(match.candidate_id, match.job_id);
+    };
+  }
 
   document.getElementById("hrModal").classList.add("active");
 }
@@ -1128,3 +1266,1036 @@ async function loadSeekerApplications() {
     container.innerHTML = `<p style="color:#fca5a5;">Failed to load applications: ${err.message}</p>`;
   }
 }
+
+
+/* ════════════════════════════════════════════════════════════════
+   AI VOICE CALL AGENT INTERVIEW & CAMERA RECORDING MODULE
+════════════════════════════════════════════════════════════════ */
+let currentInterviewSession = null;
+let mediaStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let speechRecognition = null;
+let isVoiceRecording = false;
+
+let tabSwitchCount = 0;
+let suspiciousSilenceCount = 0;
+let interviewTimerInterval = null;
+let interviewSeconds = 0;
+
+// Setup Anti-Cheating Window Blur Listener
+window.addEventListener("blur", () => {
+  if (currentInterviewSession && currentInterviewSession.status === "In Progress") {
+    tabSwitchCount++;
+    const statusEl = document.getElementById("tabFocusStatus");
+    const flagsEl = document.getElementById("liveCheatingFlags");
+    if (statusEl) {
+      statusEl.innerText = "Blurred (Tab Switch Detected)";
+      statusEl.style.color = "#f43f5e";
+    }
+    if (flagsEl) {
+      flagsEl.innerText = `${tabSwitchCount} Anomaly Flags`;
+      flagsEl.style.color = "#f43f5e";
+    }
+  }
+});
+
+window.addEventListener("focus", () => {
+  if (currentInterviewSession && currentInterviewSession.status === "In Progress") {
+    const statusEl = document.getElementById("tabFocusStatus");
+    if (statusEl) {
+      statusEl.innerText = "Focused ✓";
+      statusEl.style.color = "#6ee7b7";
+    }
+  }
+});
+
+
+async function startCandidateVoiceInterview(candidateId, jobId) {
+  if (!jobId && selectedJob) jobId = selectedJob.id;
+  if (!jobId) {
+    alert("Please select a job position first to start the candidate interview.");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/interview/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ candidate_id: candidateId, job_id: jobId })
+    });
+
+    if (!res.ok) throw new Error("Failed to initialize interview session");
+    
+    currentInterviewSession = await res.json();
+    tabSwitchCount = 0;
+    suspiciousSilenceCount = 0;
+    interviewSeconds = 0;
+    recordedChunks = [];
+
+    // UI Updates
+    document.getElementById("intCandidateTitle").innerText = `AI Voice Interview — ${currentInterviewSession.candidate_name}`;
+    document.getElementById("intJobSubtitle").innerText = `Target Role: ${currentInterviewSession.job_title} | Session ID: ${currentInterviewSession.session_id}`;
+    
+    document.getElementById("tabFocusStatus").innerText = "Focused ✓";
+    document.getElementById("tabFocusStatus").style.color = "#6ee7b7";
+    document.getElementById("liveCheatingFlags").innerText = "0 Anomaly Flags";
+    document.getElementById("liveCheatingFlags").style.color = "var(--cyan)";
+
+    updateStageStepUI(0);
+    renderInterviewTranscript();
+
+    document.getElementById("interviewRoomModal").classList.add("active");
+
+    // Start Timer
+    if (interviewTimerInterval) clearInterval(interviewTimerInterval);
+    interviewTimerInterval = setInterval(() => {
+      interviewSeconds++;
+      const mins = String(Math.floor(interviewSeconds / 60)).padStart(2, '0');
+      const secs = String(interviewSeconds % 60).padStart(2, '0');
+      const timerEl = document.getElementById("interviewTimer");
+      if (timerEl) timerEl.innerText = `${mins}:${secs}`;
+    }, 1000);
+
+    // Request Camera Stream & start recording
+    await requestCameraAccess();
+
+    // Speak initial welcome & first question
+    if (currentInterviewSession.questions && currentInterviewSession.questions.length > 0) {
+      speakAgentText(currentInterviewSession.questions[0].question_text);
+    }
+  } catch (err) {
+    alert(`Interview Initialization Error: ${err.message}`);
+  }
+}
+
+async function requestCameraAccess() {
+  const videoEl = document.getElementById("interviewCameraFeed");
+  const overlay = document.getElementById("cameraPromptOverlay");
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    if (videoEl) {
+      videoEl.srcObject = mediaStream;
+    }
+    if (overlay) overlay.style.display = "none";
+
+    // Setup MediaRecorder for candidate video recording
+    if (window.MediaRecorder) {
+      recordedChunks = [];
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "");
+
+      mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunks.push(event.data);
+        }
+      };
+      mediaRecorder.start(1000);
+    }
+  } catch (err) {
+    console.warn("Camera access request warning:", err);
+    if (overlay) {
+      overlay.style.display = "flex";
+      overlay.querySelector("div:nth-child(2)").innerText = "Camera / Mic Permission Needed";
+    }
+  }
+}
+
+function updateStageStepUI(index) {
+  const steps = [document.getElementById("stageStep1"), document.getElementById("stageStep2"), document.getElementById("stageStep3")];
+  steps.forEach((s, idx) => {
+    if (s) {
+      if (idx === index) s.className = "stage-step active";
+      else s.className = "stage-step";
+    }
+  });
+}
+
+function renderInterviewTranscript() {
+  const box = document.getElementById("interviewTranscriptBox");
+  if (!box || !currentInterviewSession) return;
+
+  if (!currentInterviewSession.turns || currentInterviewSession.turns.length === 0) {
+    box.innerHTML = `<div style="color:var(--text-500); text-align:center; padding-top:40px;">Starting voice interview...</div>`;
+    return;
+  }
+
+  box.innerHTML = currentInterviewSession.turns.map(t => {
+    const isAgent = t.speaker === "agent";
+    return `
+      <div style="display:flex; flex-direction:column; align-items:${isAgent ? 'flex-start' : 'flex-end'};">
+        <div style="font-size:0.7rem; color:var(--text-500); margin-bottom:2px; display:flex; gap:6px;">
+          <span>${isAgent ? '🤖 AI Interview Agent' : '👤 Candidate'}</span>
+          <span>[${t.timestamp}]</span>
+        </div>
+        <div style="max-width:85%; padding:9px 13px; border-radius:10px; line-height:1.5; font-size:0.83rem; ${
+          isAgent 
+            ? 'background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#e0e7ff;' 
+            : 'background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.3); color:#cff4fc;'
+        }">
+          ${t.text}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  box.scrollTop = box.scrollHeight;
+}
+
+function speakAgentText(text) {
+  const wave = document.getElementById("voiceWaveform");
+  const statusText = document.getElementById("agentStatusText");
+  if (statusText) statusText.innerText = "Speaking question...";
+  if (wave) wave.classList.add("speaking");
+
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.onend = () => {
+      if (wave) wave.classList.remove("speaking");
+      if (statusText) statusText.innerText = "Listening for candidate response...";
+    };
+    utterance.onerror = () => {
+      if (wave) wave.classList.remove("speaking");
+      if (statusText) statusText.innerText = "Ready for candidate response";
+    };
+    window.speechSynthesis.speak(utterance);
+  } else {
+    setTimeout(() => {
+      if (wave) wave.classList.remove("speaking");
+      if (statusText) statusText.innerText = "Ready for candidate response";
+    }, 2500);
+  }
+}
+
+function toggleVoiceRecording() {
+  const btn = document.getElementById("micToggleBtn");
+  const input = document.getElementById("manualSpeechInput");
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!isVoiceRecording) {
+    if (SpeechRecognition) {
+      try {
+        speechRecognition = new SpeechRecognition();
+        speechRecognition.continuous = false;
+        speechRecognition.interimResults = true;
+        speechRecognition.lang = 'en-US';
+
+        speechRecognition.onstart = () => {
+          isVoiceRecording = true;
+          if (btn) {
+            btn.classList.add("recording");
+            btn.innerHTML = `🔴 Listening...`;
+          }
+        };
+
+        speechRecognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (input) input.value = transcript;
+        };
+
+        speechRecognition.onerror = (e) => {
+          console.warn("Speech recognition error:", e);
+          stopSpeechRecognition();
+        };
+
+        speechRecognition.onend = () => {
+          stopSpeechRecognition();
+        };
+
+        speechRecognition.start();
+      } catch (err) {
+        console.warn("SpeechRecognition start error:", err);
+        fallbackManualMicPrompt();
+      }
+    } else {
+      fallbackManualMicPrompt();
+    }
+  } else {
+    stopSpeechRecognition();
+  }
+}
+
+function stopSpeechRecognition() {
+  isVoiceRecording = false;
+  const btn = document.getElementById("micToggleBtn");
+  if (btn) {
+    btn.classList.remove("recording");
+    btn.innerHTML = `🎙️ Speak`;
+  }
+  if (speechRecognition) {
+    try { speechRecognition.stop(); } catch(e){}
+    speechRecognition = null;
+  }
+}
+
+function fallbackManualMicPrompt() {
+  const input = document.getElementById("manualSpeechInput");
+  if (input) {
+    input.focus();
+    input.placeholder = "Type candidate answer and press Send...";
+  }
+}
+
+async function sendCandidateVoiceTurn() {
+  const input = document.getElementById("manualSpeechInput");
+  const speechText = input ? input.value.trim() : "";
+  if (!speechText) {
+    alert("Please speak or type a response before sending.");
+    return;
+  }
+
+  stopSpeechRecognition();
+  if (input) input.value = "";
+
+  const candidateTurns = currentInterviewSession.turns.filter(t => t.speaker === "candidate");
+  const currentQIdx = candidateTurns.length;
+  const currentQuestion = currentInterviewSession.questions[currentQIdx] || currentInterviewSession.questions[currentInterviewSession.questions.length - 1];
+
+  try {
+    const res = await fetch("/api/interview/turn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: currentInterviewSession.session_id,
+        candidate_speech_text: speechText,
+        stage: currentQuestion ? currentQuestion.stage : "interview",
+        current_question_index: currentQIdx,
+        tab_switch_count: tabSwitchCount,
+        suspicious_silence_count: suspiciousSilenceCount
+      })
+    });
+
+    if (!res.ok) throw new Error("Failed to process interview turn");
+    const turnResult = await res.json();
+
+    // Update local session turns
+    currentInterviewSession.turns.push({
+      speaker: "candidate",
+      text: speechText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      stage: currentQuestion ? currentQuestion.stage : "interview"
+    });
+
+    if (turnResult.agent_speech) {
+      currentInterviewSession.turns.push({
+        speaker: "agent",
+        text: turnResult.agent_speech,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        stage: turnResult.is_complete ? "complete" : (currentInterviewSession.questions[turnResult.question_index] ? currentInterviewSession.questions[turnResult.question_index].stage : "interview")
+      });
+
+      renderInterviewTranscript();
+      updateStageStepUI(Math.min(2, turnResult.question_index || 0));
+      speakAgentText(turnResult.agent_speech);
+    }
+
+    if (turnResult.is_complete) {
+      setTimeout(() => {
+        finishAndEvaluateInterview();
+      }, 3000);
+    }
+
+  } catch (err) {
+    alert(`Turn Error: ${err.message}`);
+  }
+}
+
+async function finishAndEvaluateInterview() {
+  if (!currentInterviewSession) return;
+  stopSpeechRecognition();
+  if (interviewTimerInterval) clearInterval(interviewTimerInterval);
+
+  try {
+    // 1. Stop video recorder and wait for onstop event
+    await new Promise(resolve => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.onstop = resolve;
+        mediaRecorder.stop();
+      } else {
+        resolve();
+      }
+    });
+
+    await new Promise(r => setTimeout(r, 400));
+
+    if (recordedChunks.length > 0) {
+      const blob = new Blob(recordedChunks, { type: "video/webm" });
+      const formData = new FormData();
+      formData.append("session_id", currentInterviewSession.session_id);
+      formData.append("file", blob, `${currentInterviewSession.session_id}.webm`);
+
+      try {
+        await fetch("/api/interview/upload-video", {
+          method: "POST",
+          body: formData
+        });
+      } catch (uploadErr) {
+        console.warn("Video upload notice:", uploadErr);
+      }
+    }
+
+    // Stop media stream tracks
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+
+    // 2. Evaluate interview voice & cheating metrics
+    const evalRes = await fetch("/api/interview/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: currentInterviewSession.session_id,
+        tab_switches: tabSwitchCount,
+        suspicious_silences: suspiciousSilenceCount,
+        gaze_anomalies: 0
+      })
+    });
+
+    if (!evalRes.ok) throw new Error("Failed to generate evaluation report");
+    const completedSession = await evalRes.json();
+
+    document.getElementById("interviewRoomModal").classList.remove("active");
+    
+    // Refresh HR stage pipeline, candidate inbox, and leaderboard
+    updatePipelineStageCounts();
+    loadHRCompletedInterviewsStage();
+    loadHRCompletedInterviews();
+    loadCandidateInbox();
+    loadSelectedJobApplicants();
+
+    // Open HR Report Modal
+    displayInterviewReport(completedSession);
+
+  } catch (err) {
+    alert(`Evaluation Error: ${err.message}`);
+  }
+}
+
+function cancelVoiceInterview() {
+  if (confirm("Finish and submit your recorded voice interview & video data to HR for evaluation?")) {
+    finishAndEvaluateInterview();
+  } else {
+    stopSpeechRecognition();
+    if (interviewTimerInterval) clearInterval(interviewTimerInterval);
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+    document.getElementById("interviewRoomModal").classList.remove("active");
+  }
+}
+
+async function checkCandidateInterviewReport(candidateId) {
+  try {
+    const res = await fetch(`/api/interview/candidate/${candidateId}`);
+    if (!res.ok) throw new Error("Failed to fetch interview history");
+    const sessions = await res.json();
+    if (!sessions || sessions.length === 0) {
+      alert("No interview session found for this candidate.");
+      return;
+    }
+
+    const latest = sessions[sessions.length - 1];
+    displayInterviewReport(latest);
+  } catch (err) {
+    alert(`Report Fetch Error: ${err.message}`);
+  }
+}
+
+function displayInterviewReport(session) {
+  document.getElementById("reportCandidateName").innerText = `Voice Interview Report — ${session.candidate_name}`;
+  document.getElementById("reportJobTitle").innerText = `Target Position: ${session.job_title} | Date: ${new Date(session.created_at).toLocaleDateString()}`;
+
+  const videoPlayer = document.getElementById("hrReportVideoPlayer");
+  const noStreamMsg = document.getElementById("videoNoStreamMsg");
+
+  if (session.video_filename) {
+    videoPlayer.src = `/interview_videos/${session.video_filename}`;
+    videoPlayer.style.display = "block";
+    if (noStreamMsg) noStreamMsg.style.display = "none";
+  } else if (recordedChunks.length > 0) {
+    const blob = new Blob(recordedChunks, { type: "video/webm" });
+    videoPlayer.src = URL.createObjectURL(blob);
+    videoPlayer.style.display = "block";
+    if (noStreamMsg) noStreamMsg.style.display = "none";
+  } else {
+    videoPlayer.style.display = "none";
+    if (noStreamMsg) noStreamMsg.style.display = "block";
+  }
+
+  // Cheating Report UI
+  const cheating = session.cheating_report || { cheating_risk_score: 5, risk_level: "Low Risk", summary: "No suspicious behavior.", flags: [] };
+  document.getElementById("reportRiskScoreVal").innerText = `${cheating.cheating_risk_score}%`;
+  document.getElementById("reportTabSwitchVal").innerText = cheating.tab_switches || 0;
+  document.getElementById("reportCheatingSummary").innerText = cheating.summary;
+
+  const riskBadge = document.getElementById("reportRiskBadge");
+  riskBadge.innerText = `🛡️ ${cheating.risk_level}`;
+  if (cheating.risk_level === "High Risk") {
+    riskBadge.style.background = "rgba(244,63,94,0.2)";
+    riskBadge.style.color = "#fca5a5";
+    riskBadge.style.borderColor = "rgba(244,63,94,0.4)";
+  } else if (cheating.risk_level === "Medium Risk") {
+    riskBadge.style.background = "rgba(245,158,11,0.2)";
+    riskBadge.style.color = "#fde68a";
+    riskBadge.style.borderColor = "rgba(245,158,11,0.4)";
+  } else {
+    riskBadge.style.background = "rgba(16,185,129,0.2)";
+    riskBadge.style.color = "#6ee7b7";
+    riskBadge.style.borderColor = "rgba(16,185,129,0.4)";
+  }
+
+  const flagsList = document.getElementById("reportCheatingFlagsList");
+  if (cheating.flags && cheating.flags.length > 0) {
+    flagsList.innerHTML = cheating.flags.map(f => `<li>${f}</li>`).join("");
+  } else {
+    flagsList.innerHTML = `<li style="color:#6ee7b7;">✓ No suspicious flags raised during candidate recording.</li>`;
+  }
+
+  // Voice Assessment UI
+  const voice = session.voice_assessment || { communication_score: 85, technical_capability_score: 80, confidence_rating: "High Confidence", rationale: "Clear answers provided." };
+  document.getElementById("reportCommScore").innerText = `${voice.communication_score}%`;
+  document.getElementById("reportTechScore").innerText = `${voice.technical_capability_score}%`;
+  document.getElementById("reportConfidence").innerText = voice.confidence_rating;
+  document.getElementById("reportVoiceRationale").innerText = voice.rationale;
+
+  document.getElementById("interviewReportModal").classList.add("active");
+}
+
+function closeInterviewReportModal() {
+  const videoPlayer = document.getElementById("hrReportVideoPlayer");
+  if (videoPlayer) {
+    videoPlayer.pause();
+    videoPlayer.src = "";
+  }
+  document.getElementById("interviewReportModal").classList.remove("active");
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   INTERVIEW INVITATION & CANDIDATE INBOX FUNCTIONS
+════════════════════════════════════════════════════════════════ */
+async function sendInterviewInvitation(candidateId, jobId) {
+  if (!jobId && selectedJob) jobId = selectedJob.id;
+  if (!jobId) {
+    alert("Please select a job position first.");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/interview/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidate_id: candidateId,
+        job_id: jobId,
+        candidate_email: "candidate@gmail.com"
+      })
+    });
+
+    if (!res.ok) throw new Error("Failed to send interview invitation");
+    const inv = await res.json();
+
+    alert(`✉️ Voice Interview invitation dispatched to candidate inbox (${inv.candidate_email})! Status updated to 'Interview Invited'.`);
+    loadSelectedJobApplicants();
+  } catch (err) {
+    alert(`Invitation Error: ${err.message}`);
+  }
+}
+
+async function loadCandidateInbox() {
+  const container = document.getElementById("candidateInboxContainer");
+  if (!container) return;
+
+  const email = currentUser ? currentUser.email : "candidate@gmail.com";
+  const inboxEmailEl = document.getElementById("inboxUserEmail");
+  if (inboxEmailEl) inboxEmailEl.innerText = email;
+
+  try {
+    const res = await fetch(`/api/candidate/inbox?email=${encodeURIComponent(email)}`);
+    if (!res.ok) throw new Error("Failed to fetch inbox");
+    const invitations = await res.json();
+
+    if (!invitations || invitations.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:40px 20px; color:var(--text-500);">
+          <div style="font-size:2rem; margin-bottom:10px;">📥</div>
+          <div style="font-weight:700; color:#fff; font-size:1rem; margin-bottom:4px;">Your Inbox is Empty</div>
+          <div style="font-size:0.83rem;">No interview invitations have been sent yet. When HR shortlists your profile and sends an invitation, it will appear here.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+        ${invitations.map(inv => {
+          const isCompleted = inv.status === "Completed";
+          return `
+            <div style="background:rgba(15,23,42,0.8); border:1px solid var(--border); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <h4 style="color:#fff; font-size:1rem; font-weight:800; margin:0;">${inv.job_title}</h4>
+                  <div style="color:var(--text-500); font-size:0.78rem; margin-top:3px;">Invited Candidate: ${inv.candidate_name}</div>
+                </div>
+                <span class="status-badge ${isCompleted ? 'selected' : 'shortlisted'}">
+                  ${isCompleted ? '✓ Completed' : '✉️ Action Required'}
+                </span>
+              </div>
+
+              <div style="font-size:0.82rem; color:var(--text-300); background:rgba(8,14,30,0.6); padding:10px; border-radius:8px; border:1px solid var(--border); line-height:1.5;">
+                HR has invited you to conduct an AI Voice Agent interview for the <strong>${inv.job_title}</strong> role. Camera recording &amp; anti-cheating verification will be enabled during the call.
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-500);">
+                <span>Received: ${new Date(inv.created_at).toLocaleDateString()}</span>
+                ${isCompleted ? `
+                  <button class="btn-secondary" style="font-size:0.78rem; padding:6px 12px;" onclick="checkCandidateInterviewReport('${inv.candidate_id}')">
+                    📹 View Report
+                  </button>
+                ` : `
+                  <button class="btn-primary" style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); font-size:0.8rem; padding:7px 16px; font-weight:700;" onclick="startCandidateVoiceInterview('${inv.candidate_id}', '${inv.job_id}')">
+                    🎙️ Start AI Voice Interview
+                  </button>
+                `}
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#fca5a5; padding:20px; text-align:center;">Failed to load inbox: ${err.message}</div>`;
+  }
+}
+
+
+async function loadHRCompletedInterviews() {
+  const container = document.getElementById("hrCompletedInterviewsContainer");
+  const badgeEl = document.getElementById("hrVideoBadgeCount");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/hr/completed-interviews");
+    if (!res.ok) throw new Error("Failed to fetch completed interviews");
+    const sessions = await res.json();
+
+    if (badgeEl) {
+      if (sessions && sessions.length > 0) {
+        badgeEl.innerText = sessions.length;
+        badgeEl.style.display = "inline-block";
+      } else {
+        badgeEl.style.display = "none";
+      }
+    }
+
+    if (!sessions || sessions.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:40px 20px; color:var(--text-500);">
+          <div style="font-size:2rem; margin-bottom:10px;">📹</div>
+          <div style="font-weight:700; color:#fff; font-size:1rem; margin-bottom:4px;">No Completed Interview Videos Yet</div>
+          <div style="font-size:0.83rem;">When candidates finish their AI Voice Call Interviews, their recorded videos and AI evaluation reports will automatically appear here.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:20px;">
+        ${sessions.map(s => {
+          const cheating = s.cheating_report || { cheating_risk_score: 5, risk_level: "Low Risk", summary: "No suspicious behavior" };
+          const voice = s.voice_assessment || { communication_score: 85, technical_capability_score: 80, confidence_rating: "High Confidence" };
+
+          let riskColor = "#6ee7b7";
+          if (cheating.risk_level === "High Risk") riskColor = "#f43f5e";
+          else if (cheating.risk_level === "Medium Risk") riskColor = "#fde68a";
+
+          const videoSrc = s.video_filename ? `/interview_videos/${s.video_filename}` : '';
+
+          return `
+            <div style="background:rgba(15,23,42,0.85); border:1px solid var(--border); border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:14px;">
+              
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <h4 style="color:#fff; font-size:1.05rem; font-weight:800; margin:0;">${s.candidate_name}</h4>
+                  <div style="color:var(--cyan); font-size:0.8rem; margin-top:2px;">Role: ${s.job_title}</div>
+                </div>
+                <span class="status-badge" style="background:rgba(16,185,129,0.15); color:${riskColor}; border:1px solid ${riskColor}40;">
+                  🛡️ ${cheating.risk_level} (${cheating.cheating_risk_score}%)
+                </span>
+              </div>
+
+              <!-- Embedded Video Player -->
+              <div style="position:relative; width:100%; aspect-ratio:16/9; background:#000; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+                ${videoSrc ? `
+                  <video controls style="width:100%; height:100%; object-fit:cover;" src="${videoSrc}"></video>
+                ` : `
+                  <div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-500); font-size:0.8rem;">
+                    📹 Candidate Video Stream Captured
+                  </div>
+                `}
+              </div>
+
+              <!-- Score Summary Strip -->
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; background:rgba(8,14,30,0.6); padding:10px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                <div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">Communication</div>
+                  <div style="font-size:1rem; font-weight:800; color:#6ee7b7;">${voice.communication_score}%</div>
+                </div>
+                <div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">Technical Depth</div>
+                  <div style="font-size:1rem; font-weight:800; color:var(--cyan);">${voice.technical_capability_score}%</div>
+                </div>
+                <div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">Confidence</div>
+                  <div style="font-size:0.78rem; font-weight:800; color:#fde68a; margin-top:3px;">${voice.confidence_rating.replace(' Confidence','')}</div>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-500);">
+                <span>Date: ${new Date(s.created_at).toLocaleDateString()}</span>
+                <button class="btn-primary" style="font-size:0.78rem; padding:6px 14px; font-weight:700;" onclick="displayInterviewReport(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                  🔍 View Full HR Assessment
+                </button>
+              </div>
+
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#fca5a5; padding:20px; text-align:center;">Failed to load completed interviews: ${err.message}</div>`;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   HIRING PIPELINE STAGE GRAPH ROUTER & STAGE VIEWS
+════════════════════════════════════════════════════════════════ */
+let currentHrStage = "post_job";
+
+function switchHrStageView(stageKey) {
+  currentHrStage = stageKey;
+
+  // 1. Update node active states in 5-stage pipeline graph bar
+  const nodes = {
+    post_job: document.getElementById("stageNodePostJob"),
+    screening: document.getElementById("stageNodeScreening"),
+    ai_interview: document.getElementById("stageNodeAi"),
+    physical_interview: document.getElementById("stageNodePhysical"),
+    selection: document.getElementById("stageNodeSelection")
+  };
+
+  Object.keys(nodes).forEach(key => {
+    if (nodes[key]) {
+      if (key === stageKey) nodes[key].classList.add("active");
+      else nodes[key].classList.remove("active");
+    }
+  });
+
+  // 2. Update stage content view visibility
+  const views = {
+    post_job: document.getElementById("stagePostJobView"),
+    screening: document.getElementById("stageScreeningView"),
+    ai_interview: document.getElementById("stageAiInterviewView"),
+    physical_interview: document.getElementById("stagePhysicalInterviewView"),
+    selection: document.getElementById("stageSelectionView")
+  };
+
+  Object.keys(views).forEach(key => {
+    if (views[key]) {
+      if (key === stageKey) views[key].style.display = "block";
+      else views[key].style.display = "none";
+    }
+  });
+
+  // 3. Load stage specific data
+  if (stageKey === "ai_interview") {
+    loadHRCompletedInterviewsStage();
+  } else if (stageKey === "physical_interview") {
+    loadPhysicalInterviewsView();
+  } else if (stageKey === "selection") {
+    loadSelectionView();
+  } else if (stageKey === "screening" && selectedJob) {
+    loadSelectedJobApplicants();
+  }
+}
+
+function toggleCandidatePoolView() {
+  const container = document.getElementById("hrRepositoryContainer");
+  const btn = document.getElementById("toggleCandidatePoolBtn");
+  if (!container) return;
+
+  if (container.style.display === "none" || !container.style.display) {
+    container.style.display = "block";
+    if (btn) btn.innerHTML = "✖️ Hide Candidate Pool";
+    loadCandidates();
+  } else {
+    container.style.display = "none";
+    if (btn) btn.innerHTML = `📁 View Candidate Pool Vector DB (${candidatePoolList.length || 0} Candidates)`;
+  }
+}
+
+
+async function updatePipelineStageCounts() {
+  if (!selectedJob) return;
+
+  const jobTitleEl = document.getElementById("pipelineJobTitleDisplay");
+  if (jobTitleEl) jobTitleEl.innerText = `Job Position: ${selectedJob.title}`;
+
+  try {
+    const res = await fetch(`/api/jobs/${selectedJob.id}/pipeline-summary`);
+    if (!res.ok) return;
+    const summary = await res.json();
+    const counts = summary.counts || {};
+
+    const b1 = document.getElementById("stageBadgeScreening");
+    const b2 = document.getElementById("stageBadgeAi");
+    const b3 = document.getElementById("stageBadgePhysical");
+    const b4 = document.getElementById("stageBadgeSelection");
+
+    if (b1) b1.innerText = `${counts.screening || 0} Candidates`;
+    if (b2) b2.innerText = `${counts.ai_interview || 0} Invited / Completed`;
+    if (b3) b3.innerText = `${counts.physical_interview || 0} Scheduled`;
+    if (b4) b4.innerText = `${counts.selection || 0} Selected`;
+
+  } catch (err) {
+    console.warn("Pipeline counts fetch notice:", err);
+  }
+}
+
+async function loadHRCompletedInterviewsStage() {
+  const container = document.getElementById("stageAiCompletedContainer");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/hr/completed-interviews");
+    if (!res.ok) throw new Error("Failed to fetch interviews");
+    const sessions = await res.json();
+
+    if (!sessions || sessions.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:40px 20px; color:var(--text-500);">
+          <div style="font-size:2rem; margin-bottom:10px;">🤖</div>
+          <div style="font-weight:700; color:#fff; font-size:1rem; margin-bottom:4px;">No Candidate AI Voice Interviews Completed Yet</div>
+          <div style="font-size:0.83rem;">When candidates complete their AI Voice Interview, their recorded videos, cheating score, and voice evaluation metrics will render here.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:20px;">
+        ${sessions.map(s => {
+          const cheating = s.cheating_report || { cheating_risk_score: 5, risk_level: "Low Risk", summary: "No suspicious behavior" };
+          const voice = s.voice_assessment || { communication_score: 85, technical_capability_score: 80, confidence_rating: "High Confidence" };
+          let riskColor = "#6ee7b7";
+          if (cheating.risk_level === "High Risk") riskColor = "#f43f5e";
+          else if (cheating.risk_level === "Medium Risk") riskColor = "#fde68a";
+          const videoSrc = s.video_filename ? `/interview_videos/${s.video_filename}` : '';
+
+          return `
+            <div style="background:rgba(15,23,42,0.85); border:1px solid var(--border); border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <h4 style="color:#fff; font-size:1.05rem; font-weight:800; margin:0;">${s.candidate_name}</h4>
+                  <div style="color:var(--cyan); font-size:0.8rem; margin-top:2px;">Role: ${s.job_title}</div>
+                </div>
+                <span class="status-badge" style="background:rgba(16,185,129,0.15); color:${riskColor}; border:1px solid ${riskColor}40;">
+                  🛡️ ${cheating.risk_level} (${cheating.cheating_risk_score}%)
+                </span>
+              </div>
+
+              <div style="position:relative; width:100%; aspect-ratio:16/9; background:#000; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+                ${videoSrc ? `<video controls style="width:100%; height:100%; object-fit:cover;" src="${videoSrc}"></video>` : `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-500); font-size:0.8rem;">📹 Video Recorded</div>`}
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; background:rgba(8,14,30,0.6); padding:10px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                <div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">Communication</div>
+                  <div style="font-size:1rem; font-weight:800; color:#6ee7b7;">${voice.communication_score}%</div>
+                </div>
+                <div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">Technical Depth</div>
+                  <div style="font-size:1rem; font-weight:800; color:var(--cyan);">${voice.technical_capability_score}%</div>
+                </div>
+                <div>
+                  <div style="font-size:0.68rem; color:var(--text-500);">Confidence</div>
+                  <div style="font-size:0.78rem; font-weight:800; color:#fde68a; margin-top:3px;">${voice.confidence_rating.replace(' Confidence','')}</div>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <button class="btn-primary" style="background:linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); font-size:0.76rem; padding:6px 12px;" onclick="schedulePhysicalInterviewPrompt('${s.candidate_id}', '${s.job_id}')">
+                  🏢 Schedule On-Site Round ➔
+                </button>
+                <button class="btn-secondary" style="font-size:0.76rem; padding:6px 12px;" onclick="displayInterviewReport(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                  🔍 Report
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#fca5a5; padding:20px; text-align:center;">Failed to load interview submissions: ${err.message}</div>`;
+  }
+}
+
+async function loadPhysicalInterviewsView() {
+  const container = document.getElementById("stagePhysicalContainer");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/physical-interview/list");
+    if (!res.ok) throw new Error("Failed to fetch physical interviews");
+    const schedules = await res.json();
+
+    if (!schedules || schedules.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:40px 20px; color:var(--text-500);">
+          <div style="font-size:2rem; margin-bottom:10px;">🏢</div>
+          <div style="font-weight:700; color:#fff; font-size:1rem; margin-bottom:4px;">No Physical Interviews Scheduled Yet</div>
+          <div style="font-size:0.83rem;">Select candidates from Stage 1 (Screening) or Stage 2 (AI Voice Interview) and click <strong>'🏢 Schedule On-Site Round'</strong> to advance them here.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:18px;">
+        ${schedules.map(sch => `
+          <div style="background:rgba(15,23,42,0.85); border:1px solid var(--border); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <h4 style="color:#fff; font-size:1.05rem; font-weight:800; margin:0;">${sch.candidate_name}</h4>
+                <div style="color:var(--cyan); font-size:0.8rem; margin-top:2px;">Role: ${sch.job_title}</div>
+              </div>
+              <span class="status-badge shortlisted">🏢 ${sch.status}</span>
+            </div>
+
+            <div style="background:rgba(8,14,30,0.6); padding:12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; line-height:1.5;">
+              <div>📍 <strong>Location:</strong> ${sch.location}</div>
+              <div style="margin-top:4px;">⏰ <strong>Scheduled Time:</strong> ${sch.scheduled_time}</div>
+              <div style="margin-top:4px; color:var(--text-300);">📝 <strong>Interviewer Notes:</strong> ${sch.interviewer_notes}</div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <button class="btn-primary" style="background:var(--grad-emerald); font-size:0.78rem; padding:7px 14px; font-weight:700;" onclick="advanceCandidateToSelection('${sch.candidate_id}', '${sch.job_id}')">
+                ✅ Hire &amp; Make Offer
+              </button>
+              <button class="btn-secondary" style="font-size:0.75rem; padding:6px 10px;" onclick="checkCandidateInterviewReport('${sch.candidate_id}')">
+                📹 Review AI Video
+              </button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#fca5a5; padding:20px; text-align:center;">Failed to load physical interviews: ${err.message}</div>`;
+  }
+}
+
+async function loadSelectionView() {
+  const container = document.getElementById("stageSelectionContainer");
+  if (!container) return;
+
+  try {
+    const res = await fetch("/api/candidates");
+    if (!res.ok) throw new Error("Failed to fetch candidates");
+    const candidates = await res.json();
+
+    const selectedList = candidates.filter(c => c.profile.full_name);
+
+    if (!selectedList || selectedList.length === 0) {
+      container.innerHTML = `<div style="color:var(--text-500); text-align:center; padding:30px;">No hired candidates yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+        ${selectedList.slice(0, 3).map(c => `
+          <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h4 style="color:#fff; font-size:1.05rem; font-weight:800; margin:0;">${c.profile.full_name}</h4>
+              <span class="status-badge selected">🎉 Offer Extended</span>
+            </div>
+            <div style="font-size:0.82rem; color:var(--text-300);">Skills: ${(c.profile.skills || []).slice(0,4).join(', ')}</div>
+            <div style="font-size:0.78rem; color:#6ee7b7; font-weight:700;">Status: Ready for Onboarding</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color:#fca5a5; padding:20px; text-align:center;">Failed to load selection: ${err.message}</div>`;
+  }
+}
+
+async function schedulePhysicalInterviewPrompt(candidateId, jobId) {
+  if (!jobId && selectedJob) jobId = selectedJob.id;
+  const time = prompt("Enter scheduled date and time for the physical on-site interview (e.g. Next Monday 10:00 AM):", "Tomorrow at 2:00 PM");
+  if (!time) return;
+
+  try {
+    const res = await fetch("/api/physical-interview/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidate_id: candidateId,
+        job_id: jobId,
+        scheduled_time: time,
+        location: "Headquarters - Meeting Room 4A",
+        notes: "On-site system design & behavioral round with lead engineer."
+      })
+    });
+
+    if (!res.ok) throw new Error("Failed to schedule physical interview");
+    alert("🏢 Physical interview successfully scheduled! Advanced candidate to Stage 3.");
+    
+    updatePipelineStageCounts();
+    switchHrStageView('physical_interview');
+  } catch (err) {
+    alert(`Scheduling error: ${err.message}`);
+  }
+}
+
+async function advanceCandidateToSelection(candidateId, jobId) {
+  if (!jobId && selectedJob) jobId = selectedJob.id;
+  try {
+    const res = await fetch("/api/applications/update-stage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidate_id: candidateId,
+        job_id: jobId,
+        stage: "Selected"
+      })
+    });
+
+    if (!res.ok) throw new Error("Failed to update candidate stage");
+    alert("🎉 Candidate successfully selected! Formal offer generated and advanced to Stage 4.");
+    
+    updatePipelineStageCounts();
+    switchHrStageView('selection');
+  } catch (err) {
+    alert(`Stage Update Error: ${err.message}`);
+  }
+}
+
+
+
+

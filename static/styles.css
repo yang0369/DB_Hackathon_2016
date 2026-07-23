@@ -996,3 +996,226 @@ input[type=range]::-webkit-slider-thumb {
     padding: 20px;
   }
 }
+
+/* ── AI Voice Interview Room Styles ─────────────────── */
+.live-rec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f43f5e;
+  animation: pulse-rec 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-rec {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.agent-avatar-glow {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+}
+
+.voice-wave-container {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+
+.wave-bar {
+  width: 3px;
+  height: 100%;
+  background: var(--cyan);
+  border-radius: 2px;
+  opacity: 0.4;
+  transition: height 0.2s ease;
+}
+
+.voice-wave-container.speaking .wave-bar {
+  opacity: 1;
+  animation: wave-anim 0.8s infinite ease-in-out alternate;
+}
+
+.voice-wave-container.speaking .wave-bar:nth-child(1) { animation-delay: 0.0s; }
+.voice-wave-container.speaking .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+.voice-wave-container.speaking .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+.voice-wave-container.speaking .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+.voice-wave-container.speaking .wave-bar:nth-child(5) { animation-delay: 0.6s; }
+
+@keyframes wave-anim {
+  0% { height: 6px; }
+  100% { height: 24px; }
+}
+
+.stage-step {
+  flex: 1;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-500);
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.stage-step.active {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--cyan);
+  border-color: rgba(6, 182, 212, 0.35);
+}
+
+.mic-btn {
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.mic-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
+.mic-btn.recording {
+  background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%);
+  animation: pulse-mic 1s infinite alternate;
+}
+
+@keyframes pulse-mic {
+  0% { box-shadow: 0 0 6px rgba(244, 63, 94, 0.4); }
+  100% { box-shadow: 0 0 16px rgba(244, 63, 94, 0.8); }
+}
+
+/* ── Interactive Stage Pipeline Graph ───────────────── */
+.pipeline-graph-wrapper {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.pipeline-graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.pipeline-nodes-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.stage-node-card {
+  flex: 1;
+  min-width: 190px;
+  background: rgba(8, 14, 30, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  user-select: none;
+}
+
+.stage-node-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 6px 18px rgba(6, 182, 212, 0.15);
+}
+
+.stage-node-card.active {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
+  border-color: var(--cyan);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.25);
+}
+
+.stage-step-num {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--text-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stage-node-card.active .stage-step-num {
+  color: var(--cyan);
+}
+
+.stage-node-title {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #fff;
+  margin: 3px 0 2px;
+}
+
+.stage-node-sub {
+  font-size: 0.72rem;
+  color: var(--text-500);
+  line-height: 1.3;
+}
+
+.stage-count-pill {
+  display: inline-block;
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text-300);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.stage-node-card.active .stage-count-pill {
+  background: rgba(6, 182, 212, 0.2);
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #cff4fc;
+}
+
+.stage-connector-arrow {
+  color: var(--text-500);
+  font-size: 1.1rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+

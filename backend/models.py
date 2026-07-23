@@ -126,3 +126,80 @@ class CandidateRecord(BaseModel):
     created_at: str
 
 
+class InterviewQuestion(BaseModel):
+    id: str
+    stage: str = Field(description="Stage: experience, capability, qa")
+    question_text: str
+    expected_aspects: List[str] = Field(default_factory=list)
+
+class InterviewTurn(BaseModel):
+    speaker: str = Field(description="agent or candidate")
+    text: str
+    timestamp: str
+    stage: Optional[str] = "interview"
+
+class VoiceAssessment(BaseModel):
+    communication_score: float = Field(default=85.0, description="Score 0-100 for clarity, fluency, and expression")
+    technical_capability_score: float = Field(default=80.0, description="Score 0-100 for skill & domain expertise shown in answers")
+    confidence_rating: str = Field(default="High Confidence", description="High, Moderate, Low")
+    rationale: str = Field(default="Candidate articulated technical experience clearly with relevant project examples.")
+    strengths: List[str] = Field(default_factory=list)
+    areas_for_improvement: List[str] = Field(default_factory=list)
+
+class CheatingReport(BaseModel):
+    cheating_risk_score: float = Field(default=10.0, description="Cheating risk score 0-100 (0=no risk, 100=high risk)")
+    risk_level: str = Field(default="Low Risk", description="Low Risk, Medium Risk, High Risk")
+    tab_switches: int = Field(default=0)
+    suspicious_silences: int = Field(default=0)
+    gaze_anomalies: int = Field(default=0)
+    flags: List[str] = Field(default_factory=list)
+    summary: str = Field(default="No suspicious behavior or cheating indicators detected during video call.")
+
+class InterviewSession(BaseModel):
+    session_id: str
+    candidate_id: str
+    candidate_name: str
+    job_id: str
+    job_title: str
+    status: str = Field(default="In Progress", description="In Progress, Completed")
+    created_at: str
+    questions: List[InterviewQuestion] = Field(default_factory=list)
+    turns: List[InterviewTurn] = Field(default_factory=list)
+    voice_assessment: Optional[VoiceAssessment] = None
+    cheating_report: Optional[CheatingReport] = None
+    video_filename: Optional[str] = None
+
+
+class UserAccount(BaseModel):
+    email: str
+    name: str
+    role: str = Field(description="hr or candidate")
+    candidate_id: Optional[str] = None
+
+class InterviewInvitation(BaseModel):
+    invitation_id: str
+    candidate_email: str
+    candidate_id: str
+    candidate_name: str
+    job_id: str
+    job_title: str
+    status: str = Field(default="Pending", description="Pending, Completed")
+    created_at: str
+
+class PhysicalInterviewSchedule(BaseModel):
+    schedule_id: str
+    candidate_id: str
+    candidate_name: str
+    job_id: str
+    job_title: str
+    location: str = Field(default="Headquarters - Meeting Room 4A")
+    scheduled_time: str
+    interviewer_notes: Optional[str] = "Technical On-Site Interview & System Architecture Round"
+    status: str = Field(default="Scheduled", description="Scheduled, Completed")
+    created_at: str
+
+
+
+
+
+
